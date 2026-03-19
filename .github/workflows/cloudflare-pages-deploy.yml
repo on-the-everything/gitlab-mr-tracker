@@ -12,7 +12,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build projectt
+      - name: Build project
         run: bun run build
 
       - name: Upload to Cloudflare Pages
