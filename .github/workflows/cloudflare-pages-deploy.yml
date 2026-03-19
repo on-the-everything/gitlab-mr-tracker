@@ -22,10 +22,16 @@ jobs:
             bun install --frozen-lockfile
             bun run build
 
-      - name: Deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4.65.0"
-          command: pages deploy dist
+      - name: Install Wrangler CLI
+        run: bun install -g wrangler
+
+      - name: Deploy to Cloudflare Pages
+        run: wrangler pages deploy dist
+
+    #   - name: Deploy
+    #     uses: cloudflare/wrangler-action@v3
+    #     with:
+    #       apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    #       accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    #       wranglerVersion: "4.65.0"
+    #       command: pages deploy dist
