@@ -1,0 +1,7 @@
+{
+  "extends": ["biome:recommended"],
+  "files": ["src/**/*.ts", "src/**/*.tsx"],
+  "rules": {
+    // Add custom rules here if needed
+  }
+}
