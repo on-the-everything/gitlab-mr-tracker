@@ -20,7 +20,7 @@ A single-page web application for tracking the latest status of GitLab merge req
 
 ### Prerequisites
 
-- Bun
+- Bun 1.0+
 
 ### Installation
 

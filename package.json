@@ -2,6 +2,9 @@
   "name": "gitlab-mr-tracker",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "bun": ">=1.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
