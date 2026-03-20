@@ -9,13 +9,14 @@ interface MergedUATPageProps {
     isRead: (id: string) => boolean;
     onBack: () => void;
     labelFilter?: string;
+    onLabelClick?: (label: string) => void;
 }
 
 const isWaitingUATLabel = (label: string) => {
     return /\b(uat)\b/i.test(label) || /waiting.*uat/i.test(label) || /wait.*uat/i.test(label);
 };
 
-export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilter }: MergedUATPageProps) {
+export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilter, onLabelClick }: MergedUATPageProps) {
     // Filter for merged MRs that are waiting for UAT (labels containing uat/waiting uat)
     let mergedWaiting = mrList.filter((mr) => {
         if (mr.status !== MRStatus.MERGED) return false;
@@ -63,6 +64,7 @@ export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComm
                         onMarkAsUnread={onMarkAsUnread}
                         hasNewComments={(mr) => hasNewComments(mr)}
                         isRead={(id) => isRead(id)}
+                        onLabelClick={onLabelClick}
                     />
                 )}
             </div>

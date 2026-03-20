@@ -311,6 +311,7 @@ function App() {
                 isRead={(id) => isRead(id)}
                 onBack={() => navigate('/')}
                 labelFilter={labelFilter}
+                onLabelClick={(label) => setLabelFilter(label)}
               />
             )}
           />
