@@ -9,9 +9,10 @@ interface MRTableProps {
   onMarkAsUnread: (id: string) => void;
   hasNewComments: (mr: MergeRequest) => boolean;
   isRead: (id: string) => boolean;
+  onLabelClick?: (label: string) => void;
 }
 
-export function MRTable({ title, mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead }: MRTableProps) {
+export function MRTable({ title, mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onLabelClick }: MRTableProps) {
   if (mrList.length === 0) {
     return null;
   }
@@ -57,6 +58,7 @@ export function MRTable({ title, mrList, onMarkAsRead, onMarkAsUnread, hasNewCom
                   onMarkAsUnread={onMarkAsUnread}
                   hasNewComments={hasNewComments(mr)}
                   isRead={isRead(mr.id)}
+                  onLabelClick={onLabelClick}
                 />
               ))}
             </tbody>

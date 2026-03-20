@@ -269,6 +269,7 @@ function App() {
                     onMarkAsUnread={markMRAsUnread}
                     hasNewComments={hasNewComments}
                     isRead={isRead}
+                    onLabelClick={(label) => setLabelFilter(label)}
                   />
                 )}
 
@@ -280,6 +281,7 @@ function App() {
                     onMarkAsUnread={markMRAsUnread}
                     hasNewComments={hasNewComments}
                     isRead={isRead}
+                    onLabelClick={(label) => setLabelFilter(label)}
                   />
                 )}
 
@@ -291,6 +293,7 @@ function App() {
                     onMarkAsUnread={markMRAsUnread}
                     hasNewComments={hasNewComments}
                     isRead={isRead}
+                    onLabelClick={(label) => setLabelFilter(label)}
                   />
                 )}
               </>

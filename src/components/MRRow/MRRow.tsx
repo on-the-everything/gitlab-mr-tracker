@@ -11,6 +11,7 @@ interface MRRowProps {
   onMarkAsUnread: (id: string) => void;
   hasNewComments: boolean;
   isRead: boolean;
+  onLabelClick?: (label: string) => void;
 }
 
 export function MRRow({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead }: MRRowProps) {
@@ -122,8 +123,9 @@ export function MRRow({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead
             {mr.labels.map((label) => (
               <span
                 key={label}
-                className="inline-block bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-yellow-200"
+                className="inline-block bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-yellow-200 cursor-pointer hover:bg-yellow-200"
                 title={label}
+                onClick={() => onLabelClick && onLabelClick(label)}
               >
                 {label}
               </span>
