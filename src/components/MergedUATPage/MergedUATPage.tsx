@@ -1,5 +1,6 @@
 import { MRStatus, MergeRequest } from '../../types';
 import { MRTable } from '../MRTable/MRTable';
+import { useConfig } from '../../hooks/useConfig';
 
 interface MergedUATPageProps {
     mrList: MergeRequest[];
@@ -18,6 +19,7 @@ const isWaitingUATLabel = (label: string) => {
 };
 
 export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilters, onLabelClick, selectedRepository }: MergedUATPageProps) {
+    const { config } = useConfig();
     // Default: show all merged MRs. If `labelFilters` are provided, apply them.
     let mergedWaiting = mrList.filter((mr) => mr.status === MRStatus.MERGED);
 
@@ -45,13 +47,32 @@ export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComm
                         <h1 className="text-2xl font-bold text-gray-900">Merged — Waiting UAT</h1>
                         <div className="text-sm text-gray-500">Showing merged merge requests.</div>
                     </div>
-                    <div>
+                    <div className="flex items-center space-x-3">
                         <button
                             onClick={onBack}
                             className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                         >
                             ← Back
                         </button>
+
+                        {/* Compare develop -> master on GitLab for the selected repository */}
+                        {(() => {
+                            const repoPath = (selectedRepository || mergedWaiting[0]?.repository || '').replace(/^\/+|\/+$/g, '');
+                            const encodedRepoPath = repoPath
+                                ? repoPath.split('/').map((seg) => encodeURIComponent(seg)).join('/')
+                                : '';
+                            const compareUrl = repoPath ? `${config.gitlabHost.replace(/\/$/, '')}/${encodedRepoPath}/-/compare/develop...master` : '';
+                            return (
+                                <button
+                                    onClick={() => compareUrl && window.open(compareUrl, '_blank', 'noopener')}
+                                    disabled={!compareUrl}
+                                    title={compareUrl ? 'Open GitLab compare: develop → master' : 'No repository selected'}
+                                    className={`px-4 py-2 rounded-lg transition-colors ${compareUrl ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                                >
+                                    Compare develop → master
+                                </button>
+                            );
+                        })()}
                     </div>
                 </div>
 
