@@ -57,11 +57,13 @@ export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComm
 
                         {/* Compare develop -> master on GitLab for the selected repository */}
                         {(() => {
-                            const repoPath = (selectedRepository || mergedWaiting[0]?.repository || '').replace(/^\/+|\/+$/g, '');
+                            // Only enable compare when a repository is explicitly selected
+                            const repoPathRaw = (selectedRepository && selectedRepository !== 'select') ? selectedRepository : '';
+                            const repoPath = repoPathRaw.replace(/^\/+|\/+$/g, '');
                             const encodedRepoPath = repoPath
                                 ? repoPath.split('/').map((seg) => encodeURIComponent(seg)).join('/')
                                 : '';
-                            const compareUrl = repoPath ? `${config.gitlabHost.replace(/\/$/, '')}/${encodedRepoPath}/-/compare/develop...master` : '';
+                            const compareUrl = repoPath ? `${config.gitlabHost.replace(/\/$/, '')}/${encodedRepoPath}/-/compare/master...develop` : '';
                             return (
                                 <button
                                     onClick={() => compareUrl && window.open(compareUrl, '_blank', 'noopener')}
