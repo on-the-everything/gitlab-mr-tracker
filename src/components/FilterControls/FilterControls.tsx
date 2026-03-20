@@ -34,23 +34,11 @@ export function FilterControls({
             const isMerged = statusEnum === MRStatus.MERGED;
             const isDisabled = (isRejected || isMerged) && !fetchClosedMRs;
             const isChecked = isDisabled ? false : statusFilters[statusEnum];
-            
+
             return (
               <label
                 key={status}
-                className={`flex items-center gap-2 px-3 py-1 rounded ${
-            <div className="flex items-center gap-2 ml-2">
-              <label className="text-sm font-medium text-gray-700">Label filter:</label>
-              <input
-                type="text"
-                placeholder="e.g. UAT, waiting UAT"
-                value={labelFilter || ''}
-                onChange={(e) => onLabelFilterChange && onLabelFilterChange(e.target.value)}
-                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-                  isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'
-                }`}
+                className={`flex items-center gap-2 px-3 py-1 rounded ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}
               >
                 <input
                   type="checkbox"
@@ -65,6 +53,16 @@ export function FilterControls({
               </label>
             );
           })}
+        </div>
+        <div className="flex items-center gap-2 ml-2">
+          <label className="text-sm font-medium text-gray-700">Label filter:</label>
+          <input
+            type="text"
+            placeholder="e.g. UAT, waiting UAT"
+            value={labelFilter || ''}
+            onChange={(e) => onLabelFilterChange && onLabelFilterChange(e.target.value)}
+            className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
       </div>
     </div>
