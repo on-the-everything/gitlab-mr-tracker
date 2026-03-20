@@ -4,6 +4,8 @@ interface FilterControlsProps {
   statusFilters: Record<MRStatus, boolean>;
   onStatusFilterChange: (status: MRStatus, visible: boolean) => void;
   fetchClosedMRs: boolean;
+  labelFilter?: string;
+  onLabelFilterChange?: (value: string) => void;
 }
 
 const statusLabels: Record<MRStatus, string> = {
@@ -18,6 +20,8 @@ export function FilterControls({
   statusFilters,
   onStatusFilterChange,
   fetchClosedMRs,
+  labelFilter,
+  onLabelFilterChange,
 }: FilterControlsProps) {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
@@ -35,6 +39,16 @@ export function FilterControls({
               <label
                 key={status}
                 className={`flex items-center gap-2 px-3 py-1 rounded ${
+            <div className="flex items-center gap-2 ml-2">
+              <label className="text-sm font-medium text-gray-700">Label filter:</label>
+              <input
+                type="text"
+                placeholder="e.g. UAT, waiting UAT"
+                value={labelFilter || ''}
+                onChange={(e) => onLabelFilterChange && onLabelFilterChange(e.target.value)}
+                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
                   isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'
                 }`}
               >

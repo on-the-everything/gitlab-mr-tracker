@@ -6,6 +6,7 @@ import { AddMRInput } from './components/AddMRInput/AddMRInput';
 import { ConfigModal } from './components/ConfigModal/ConfigModal';
 import { MRTable } from './components/MRTable/MRTable';
 import { FilterControls } from './components/FilterControls/FilterControls';
+import MergedUATPage from './components/MergedUATPage/MergedUATPage';
 import { formatTimeAgo } from './utils/timeFormatter';
 import { MRStatus } from './types';
 import { storage } from './services/storage';
@@ -30,6 +31,7 @@ function App() {
   } = useMRData(config);
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [view, setView] = useState<'home' | 'merged-uat'>('home');
   const [statusFilters, setStatusFilters] = useState<Record<MRStatus, boolean>>(() => {
     const filters = storage.getStatusFilters();
     // If fetchClosedMRs is disabled, ensure rejected and merged are unchecked
@@ -48,6 +50,9 @@ function App() {
     storage.saveStatusFilters(statusFilters);
   }, [statusFilters]);
 
+  // Label filter state
+  const [labelFilter, setLabelFilter] = useState<string>('');
+
   // Update status filters when fetchClosedMRs changes
   useEffect(() => {
     if (!config.fetchClosedMRs) {
@@ -55,8 +60,8 @@ function App() {
       setStatusFilters((prev) => {
         const needsUpdate = prev[MRStatus.REJECTED] || prev[MRStatus.MERGED];
         if (needsUpdate) {
-          const updated = { 
-            ...prev, 
+          const updated = {
+            ...prev,
             [MRStatus.REJECTED]: false,
             [MRStatus.MERGED]: false,
           };
@@ -126,9 +131,19 @@ function App() {
     return mrs.filter((mr) => statusFilters[mr.status]);
   };
 
-  const myMRs = filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.my, true), true));
-  const teamMRs = filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.team, true), true));
-  const otherMRs = filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.other, false), false));
+  // Filter by label substring (case-insensitive). If empty, no filter applied.
+  const filterByLabel = (mrs: typeof categorized.my) => {
+    if (!labelFilter || labelFilter.trim() === '') return mrs;
+    const needle = labelFilter.trim().toLowerCase();
+    return mrs.filter((mr) => {
+      if (!mr.labels || mr.labels.length === 0) return false;
+      return mr.labels.some((l) => l.toLowerCase().includes(needle));
+    });
+  };
+
+  const myMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.my, true), true)));
+  const teamMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.team, true), true)));
+  const otherMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.other, false), false)));
 
   const handleConfigSave = (newConfig: typeof config) => {
     saveConfig(newConfig);
@@ -162,6 +177,13 @@ function App() {
                 title="Refresh all merge requests"
               >
                 🔄 Refresh
+              </button>
+              <button
+                onClick={() => setView('merged-uat')}
+                className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors"
+                title="Show merged MRs waiting for UAT"
+              >
+                🎯 Merged → UAT
               </button>
               <button
                 onClick={() => setIsConfigOpen(true)}
@@ -201,37 +223,50 @@ function App() {
           fetchClosedMRs={config.fetchClosedMRs}
         />
 
-        {/* MR Tables */}
-        {myMRs.length > 0 && (
-          <MRTable
-            title="My MRs"
-            mrList={myMRs}
-            onMarkAsRead={markMRAsRead}
-            onMarkAsUnread={markMRAsUnread}
-            hasNewComments={hasNewComments}
-            isRead={isRead}
-          />
-        )}
+        {/* Views */}
+        {view === 'home' ? (
+          <>
+            {myMRs.length > 0 && (
+              <MRTable
+                title="My MRs"
+                mrList={myMRs}
+                onMarkAsRead={markMRAsRead}
+                onMarkAsUnread={markMRAsUnread}
+                hasNewComments={hasNewComments}
+                isRead={isRead}
+              />
+            )}
 
-        {teamMRs.length > 0 && (
-          <MRTable
-            title="Team MRs"
-            mrList={teamMRs}
-            onMarkAsRead={markMRAsRead}
-            onMarkAsUnread={markMRAsUnread}
-            hasNewComments={hasNewComments}
-            isRead={isRead}
-          />
-        )}
+            {teamMRs.length > 0 && (
+              <MRTable
+                title="Team MRs"
+                mrList={teamMRs}
+                onMarkAsRead={markMRAsRead}
+                onMarkAsUnread={markMRAsUnread}
+                hasNewComments={hasNewComments}
+                isRead={isRead}
+              />
+            )}
 
-        {otherMRs.length > 0 && (
-          <MRTable
-            title="Other MRs"
-            mrList={otherMRs}
+            {otherMRs.length > 0 && (
+              <MRTable
+                title="Other MRs"
+                mrList={otherMRs}
+                onMarkAsRead={markMRAsRead}
+                onMarkAsUnread={markMRAsUnread}
+                hasNewComments={hasNewComments}
+                isRead={isRead}
+              />
+            )}
+          </>
+        ) : (
+          <MergedUATPage
+            mrList={mrList}
             onMarkAsRead={markMRAsRead}
             onMarkAsUnread={markMRAsUnread}
-            hasNewComments={hasNewComments}
-            isRead={isRead}
+            hasNewComments={(mr) => hasNewComments(mr)}
+            isRead={(id) => isRead(id)}
+            onBack={() => setView('home')}
           />
         )}
 
