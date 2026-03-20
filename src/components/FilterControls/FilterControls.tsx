@@ -6,6 +6,10 @@ interface FilterControlsProps {
   fetchClosedMRs: boolean;
   labelFilter?: string;
   onLabelFilterChange?: (value: string) => void;
+  fetchTimeUnit: 'days' | 'weeks';
+  fetchTimeValue: number;
+  onFetchTimeUnitChange: (unit: 'days' | 'weeks') => void;
+  onFetchTimeValueChange: (value: number) => void;
 }
 
 const statusLabels: Record<MRStatus, string> = {
@@ -22,6 +26,10 @@ export function FilterControls({
   fetchClosedMRs,
   labelFilter,
   onLabelFilterChange,
+  fetchTimeUnit,
+  fetchTimeValue,
+  onFetchTimeUnitChange,
+  onFetchTimeValueChange,
 }: FilterControlsProps) {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
@@ -63,6 +71,24 @@ export function FilterControls({
             onChange={(e) => onLabelFilterChange && onLabelFilterChange(e.target.value)}
             className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+        </div>
+        <div className="flex items-center gap-2 ml-2">
+          <label className="text-sm font-medium text-gray-700">Fetch time:</label>
+          <input
+            type="number"
+            min={1}
+            value={fetchTimeValue}
+            onChange={(e) => onFetchTimeValueChange(Number(e.target.value))}
+            className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <select
+            value={fetchTimeUnit}
+            onChange={(e) => onFetchTimeUnitChange(e.target.value as 'days' | 'weeks')}
+            className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="days">days</option>
+            <option value="weeks">weeks</option>
+          </select>
         </div>
       </div>
     </div>

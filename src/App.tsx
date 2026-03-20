@@ -224,6 +224,15 @@ function App() {
           statusFilters={statusFilters}
           onStatusFilterChange={handleStatusFilterChange}
           fetchClosedMRs={config.fetchClosedMRs}
+          labelFilter={labelFilter}
+          onLabelFilterChange={(v) => setLabelFilter(v)}
+          fetchTimeUnit={config.fetchTimeUnit}
+          fetchTimeValue={config.fetchTimeValue}
+          onFetchTimeUnitChange={(u) => saveConfig({ ...config, fetchTimeUnit: u })}
+          onFetchTimeValueChange={(v) => {
+            const val = Number.isNaN(Number(v)) ? config.fetchTimeValue : Number(v);
+            if (val > 0) saveConfig({ ...config, fetchTimeValue: val });
+          }}
         />
 
         <Routes>
