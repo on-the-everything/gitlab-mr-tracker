@@ -17,12 +17,8 @@ const isWaitingUATLabel = (label: string) => {
 };
 
 export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilters, onLabelClick }: MergedUATPageProps) {
-    // Filter for merged MRs that are waiting for UAT (labels containing uat/waiting uat)
-    let mergedWaiting = mrList.filter((mr) => {
-        if (mr.status !== MRStatus.MERGED) return false;
-        if (!mr.labels || mr.labels.length === 0) return false;
-        return mr.labels.some((l) => isWaitingUATLabel(l));
-    });
+    // Default: show all merged MRs. If `labelFilters` are provided, apply them.
+    let mergedWaiting = mrList.filter((mr) => mr.status === MRStatus.MERGED);
 
     // If label filters are provided, further filter the list using local data (OR semantics)
     if (labelFilters && labelFilters.length > 0) {
@@ -41,7 +37,7 @@ export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComm
                 <div className="mb-6 flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">Merged — Waiting UAT</h1>
-                        <div className="text-sm text-gray-500">Showing merge requests merged and labelled for UAT.</div>
+                        <div className="text-sm text-gray-500">Showing merged merge requests.</div>
                     </div>
                     <div>
                         <button
@@ -55,8 +51,7 @@ export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComm
 
                 {mergedWaiting.length === 0 ? (
                     <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow-sm border border-gray-200">
-                        <p className="text-lg">No merged MRs waiting for UAT were found.</p>
-                        <p className="text-sm mt-2">Make sure MRs have a label like "waiting UAT" or "UAT".</p>
+                        <p className="text-lg">No merged MRs were found.</p>
                     </div>
                 ) : (
                     <MRTable
