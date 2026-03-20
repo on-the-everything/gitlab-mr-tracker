@@ -1,4 +1,3 @@
-import React from 'react';
 import { MRStatus, MergeRequest } from '../../types';
 import { MRTable } from '../MRTable/MRTable';
 
