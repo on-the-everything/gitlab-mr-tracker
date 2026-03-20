@@ -8,19 +8,29 @@ interface MergedUATPageProps {
     hasNewComments: (mr: MergeRequest) => boolean;
     isRead: (id: string) => boolean;
     onBack: () => void;
+    labelFilter?: string;
 }
 
 const isWaitingUATLabel = (label: string) => {
     return /\b(uat)\b/i.test(label) || /waiting.*uat/i.test(label) || /wait.*uat/i.test(label);
 };
 
-export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack }: MergedUATPageProps) {
+export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilter }: MergedUATPageProps) {
     // Filter for merged MRs that are waiting for UAT (labels containing uat/waiting uat)
-    const mergedWaiting = mrList.filter((mr) => {
+    let mergedWaiting = mrList.filter((mr) => {
         if (mr.status !== MRStatus.MERGED) return false;
         if (!mr.labels || mr.labels.length === 0) return false;
         return mr.labels.some((l) => isWaitingUATLabel(l));
     });
+
+    // If a label filter is provided, further filter the list using local data
+    if (labelFilter && labelFilter.trim() !== '') {
+        const needle = labelFilter.trim().toLowerCase();
+        mergedWaiting = mergedWaiting.filter((mr) => {
+            if (!mr.labels || mr.labels.length === 0) return false;
+            return mr.labels.some((l) => l.toLowerCase().includes(needle));
+        });
+    }
 
     return (
         <div className="min-h-screen bg-gray-50">

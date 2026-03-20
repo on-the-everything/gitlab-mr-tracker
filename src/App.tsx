@@ -307,6 +307,7 @@ function App() {
                 hasNewComments={(mr) => hasNewComments(mr)}
                 isRead={(id) => isRead(id)}
                 onBack={() => navigate('/')}
+                labelFilter={labelFilter}
               />
             )}
           />
