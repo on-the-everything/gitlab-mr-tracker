@@ -8,7 +8,7 @@ interface MergedUATPageProps {
     hasNewComments: (mr: MergeRequest) => boolean;
     isRead: (id: string) => boolean;
     onBack: () => void;
-    labelFilter?: string;
+    labelFilters?: string[];
     onLabelClick?: (label: string) => void;
 }
 
@@ -16,7 +16,7 @@ const isWaitingUATLabel = (label: string) => {
     return /\b(uat)\b/i.test(label) || /waiting.*uat/i.test(label) || /wait.*uat/i.test(label);
 };
 
-export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilter, onLabelClick }: MergedUATPageProps) {
+export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilters, onLabelClick }: MergedUATPageProps) {
     // Filter for merged MRs that are waiting for UAT (labels containing uat/waiting uat)
     let mergedWaiting = mrList.filter((mr) => {
         if (mr.status !== MRStatus.MERGED) return false;
@@ -24,13 +24,15 @@ export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComm
         return mr.labels.some((l) => isWaitingUATLabel(l));
     });
 
-    // If a label filter is provided, further filter the list using local data
-    if (labelFilter && labelFilter.trim() !== '') {
-        const needle = labelFilter.trim().toLowerCase();
-        mergedWaiting = mergedWaiting.filter((mr) => {
-            if (!mr.labels || mr.labels.length === 0) return false;
-            return mr.labels.some((l) => l.toLowerCase().includes(needle));
-        });
+    // If label filters are provided, further filter the list using local data (OR semantics)
+    if (labelFilters && labelFilters.length > 0) {
+        const needles = labelFilters.map((f) => f.trim().toLowerCase()).filter(Boolean);
+        if (needles.length > 0) {
+            mergedWaiting = mergedWaiting.filter((mr) => {
+                if (!mr.labels || mr.labels.length === 0) return false;
+                return mr.labels.some((l) => needles.some((n) => l.toLowerCase().includes(n)));
+            });
+        }
     }
 
     return (

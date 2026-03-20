@@ -1,11 +1,14 @@
 import { MRStatus } from '../../types';
+import React from 'react';
 
 interface FilterControlsProps {
   statusFilters: Record<MRStatus, boolean>;
   onStatusFilterChange: (status: MRStatus, visible: boolean) => void;
   fetchClosedMRs: boolean;
-  labelFilter?: string;
-  onLabelFilterChange?: (value: string) => void;
+  labelFilters?: string[];
+  onAddLabel?: (value: string) => void;
+  onRemoveLabel?: (value: string) => void;
+  onClearLabels?: () => void;
   fetchTimeUnit: 'days' | 'weeks';
   fetchTimeValue: number;
   onFetchTimeUnitChange: (unit: 'days' | 'weeks') => void;
@@ -24,13 +27,28 @@ export function FilterControls({
   statusFilters,
   onStatusFilterChange,
   fetchClosedMRs,
-  labelFilter,
-  onLabelFilterChange,
+  labelFilters,
+  onAddLabel,
+  onRemoveLabel,
+  onClearLabels,
   fetchTimeUnit,
   fetchTimeValue,
   onFetchTimeUnitChange,
   onFetchTimeValueChange,
 }: FilterControlsProps) {
+  // local input state for adding labels
+  const [inputValue, setInputValue] = React.useState('');
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const v = inputValue.trim();
+      if (v && onAddLabel) {
+        onAddLabel(v);
+        setInputValue('');
+      }
+      e.preventDefault();
+    }
+  };
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
       <div className="flex flex-wrap items-center gap-4">
@@ -62,15 +80,43 @@ export function FilterControls({
             );
           })}
         </div>
-        <div className="flex items-center gap-2 ml-2">
+        <div className="flex items-center gap-2 ml-2 flex-wrap">
           <label className="text-sm font-medium text-gray-700">Label filter:</label>
-          <input
-            type="text"
-            placeholder="e.g. UAT, waiting UAT"
-            value={labelFilter || ''}
-            onChange={(e) => onLabelFilterChange && onLabelFilterChange(e.target.value)}
-            className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="type label and press Enter"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {labelFilters && labelFilters.length > 0 && (
+              <button
+                onClick={() => onClearLabels && onClearLabels()}
+                className="text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+
+          {labelFilters && labelFilters.length > 0 && (
+            <div className="flex items-center gap-2 mt-2">
+              {labelFilters.map((lab) => (
+                <span key={lab} className="inline-flex items-center bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-200">
+                  <span className="mr-2">{lab}</span>
+                  <button
+                    onClick={() => onRemoveLabel && onRemoveLabel(lab)}
+                    className="text-blue-600 hover:text-blue-800 px-1"
+                    aria-label={`Remove ${lab}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 ml-2">
           <label className="text-sm font-medium text-gray-700">Fetch time:</label>

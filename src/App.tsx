@@ -51,8 +51,8 @@ function App() {
     storage.saveStatusFilters(statusFilters);
   }, [statusFilters]);
 
-  // Label filter state
-  const [labelFilter, setLabelFilter] = useState<string>('');
+  // Label filters state (multiple chips)
+  const [labelFilters, setLabelFilters] = useState<string[]>([]);
 
   // Update status filters when fetchClosedMRs changes
   useEffect(() => {
@@ -132,13 +132,14 @@ function App() {
     return mrs.filter((mr) => statusFilters[mr.status]);
   };
 
-  // Filter by label substring (case-insensitive). If empty, no filter applied.
+  // Filter by label substring (case-insensitive) using multiple filters (OR).
   const filterByLabel = (mrs: typeof categorized.my) => {
-    if (!labelFilter || labelFilter.trim() === '') return mrs;
-    const needle = labelFilter.trim().toLowerCase();
+    if (!labelFilters || labelFilters.length === 0) return mrs;
+    const needles = labelFilters.map((f) => f.trim().toLowerCase()).filter(Boolean);
+    if (needles.length === 0) return mrs;
     return mrs.filter((mr) => {
       if (!mr.labels || mr.labels.length === 0) return false;
-      return mr.labels.some((l) => l.toLowerCase().includes(needle));
+      return mr.labels.some((l) => needles.some((n) => l.toLowerCase().includes(n)));
     });
   };
 
@@ -149,11 +150,11 @@ function App() {
   let teamMRs = [] as typeof categorized.team;
   let otherMRs = [] as typeof categorized.other;
 
-  if (labelFilter && labelFilter.trim() !== '') {
-    const needle = labelFilter.trim().toLowerCase();
+  if (labelFilters && labelFilters.length > 0) {
+    const needles = labelFilters.map((f) => f.trim().toLowerCase()).filter(Boolean);
     const filteredList = mrList.filter((mr) => {
       if (!mr.labels || mr.labels.length === 0) return false;
-      return mr.labels.some((l) => l.toLowerCase().includes(needle));
+      return mr.labels.some((l) => needles.some((n) => l.toLowerCase().includes(n)));
     });
 
     const categorizedFiltered = categorizeMRs(filteredList);
@@ -245,8 +246,10 @@ function App() {
           statusFilters={statusFilters}
           onStatusFilterChange={handleStatusFilterChange}
           fetchClosedMRs={config.fetchClosedMRs}
-          labelFilter={labelFilter}
-          onLabelFilterChange={(v) => setLabelFilter(v)}
+          labelFilters={labelFilters}
+          onAddLabel={(v) => setLabelFilters((prev) => prev.includes(v) ? prev : [...prev, v])}
+          onRemoveLabel={(v) => setLabelFilters((prev) => prev.filter((p) => p !== v))}
+          onClearLabels={() => setLabelFilters([])}
           fetchTimeUnit={config.fetchTimeUnit}
           fetchTimeValue={config.fetchTimeValue}
           onFetchTimeUnitChange={(u) => saveConfig({ ...config, fetchTimeUnit: u })}
@@ -269,7 +272,7 @@ function App() {
                     onMarkAsUnread={markMRAsUnread}
                     hasNewComments={hasNewComments}
                     isRead={isRead}
-                    onLabelClick={(label) => setLabelFilter(label)}
+                    onLabelClick={(label) => setLabelFilters((prev) => prev.includes(label) ? prev : [...prev, label])}
                   />
                 )}
 
@@ -281,7 +284,7 @@ function App() {
                     onMarkAsUnread={markMRAsUnread}
                     hasNewComments={hasNewComments}
                     isRead={isRead}
-                    onLabelClick={(label) => setLabelFilter(label)}
+                    onLabelClick={(label) => setLabelFilters((prev) => prev.includes(label) ? prev : [...prev, label])}
                   />
                 )}
 
@@ -293,7 +296,7 @@ function App() {
                     onMarkAsUnread={markMRAsUnread}
                     hasNewComments={hasNewComments}
                     isRead={isRead}
-                    onLabelClick={(label) => setLabelFilter(label)}
+                    onLabelClick={(label) => setLabelFilters((prev) => prev.includes(label) ? prev : [...prev, label])}
                   />
                 )}
               </>
@@ -310,8 +313,8 @@ function App() {
                 hasNewComments={(mr) => hasNewComments(mr)}
                 isRead={(id) => isRead(id)}
                 onBack={() => navigate('/')}
-                labelFilter={labelFilter}
-                onLabelClick={(label) => setLabelFilter(label)}
+                labelFilters={labelFilters}
+                onLabelClick={(label) => setLabelFilters((prev) => prev.includes(label) ? prev : [...prev, label])}
               />
             )}
           />
