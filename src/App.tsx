@@ -142,9 +142,30 @@ function App() {
     });
   };
 
-  const myMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.my, true), true)));
-  const teamMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.team, true), true)));
-  const otherMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.other, false), false)));
+  // If a label filter is present, apply it against the local MR list first
+  // and categorize those results. This ensures filtering uses only local data
+  // and does not rely on fetch-time limits.
+  let myMRs = [] as typeof categorized.my;
+  let teamMRs = [] as typeof categorized.team;
+  let otherMRs = [] as typeof categorized.other;
+
+  if (labelFilter && labelFilter.trim() !== '') {
+    const needle = labelFilter.trim().toLowerCase();
+    const filteredList = mrList.filter((mr) => {
+      if (!mr.labels || mr.labels.length === 0) return false;
+      return mr.labels.some((l) => l.toLowerCase().includes(needle));
+    });
+
+    const categorizedFiltered = categorizeMRs(filteredList);
+
+    myMRs = filterByStatus(filterByClosedMRs(categorizedFiltered.my, true));
+    teamMRs = filterByStatus(filterByClosedMRs(categorizedFiltered.team, true));
+    otherMRs = filterByStatus(filterByClosedMRs(categorizedFiltered.other, false));
+  } else {
+    myMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.my, true), true)));
+    teamMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.team, true), true)));
+    otherMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.other, false), false)));
+  }
 
   const handleConfigSave = (newConfig: typeof config) => {
     saveConfig(newConfig);
