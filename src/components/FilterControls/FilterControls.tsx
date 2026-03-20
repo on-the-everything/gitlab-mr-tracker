@@ -80,7 +80,7 @@ export function FilterControls({
             );
           })}
         </div>
-        <div className="flex items-center gap-2 ml-2 flex-wrap">
+        <div className="w-full flex items-center gap-2 mt-2">
           <label className="text-sm font-medium text-gray-700">Label filter:</label>
           <div className="flex items-center gap-2">
             <input
@@ -100,24 +100,24 @@ export function FilterControls({
               </button>
             )}
           </div>
-
-          {labelFilters && labelFilters.length > 0 && (
-            <div className="flex items-center gap-2 mt-2">
-              {labelFilters.map((lab) => (
-                <span key={lab} className="inline-flex items-center bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-200">
-                  <span className="mr-2">{lab}</span>
-                  <button
-                    onClick={() => onRemoveLabel && onRemoveLabel(lab)}
-                    className="text-blue-600 hover:text-blue-800 px-1"
-                    aria-label={`Remove ${lab}`}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
         </div>
+
+        {labelFilters && labelFilters.length > 0 && (
+          <div className="flex items-center gap-2 mt-2 w-full">
+            {labelFilters.map((lab) => (
+              <span key={lab} className="inline-flex items-center bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-200">
+                <span className="mr-2">{lab}</span>
+                <button
+                  onClick={() => onRemoveLabel && onRemoveLabel(lab)}
+                  className="text-blue-600 hover:text-blue-800 px-1"
+                  aria-label={`Remove ${lab}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-2 ml-2">
           <label className="text-sm font-medium text-gray-700">Fetch time:</label>
           <input
