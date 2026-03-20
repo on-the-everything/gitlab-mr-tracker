@@ -1,9 +1,9 @@
 export enum MRStatus {
-  NEW = 'new',
-  COMMENTED = 'commented',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  MERGED = 'merged',
+  NEW = "new",
+  COMMENTED = "commented",
+  APPROVED = "approved",
+  REJECTED = "rejected",
+  MERGED = "merged",
 }
 
 export interface Reviewer {
@@ -42,6 +42,7 @@ export interface MergeRequest {
   lastFetchedAt: string;
   createdAt: string;
   latestCommentAt?: string;
+  labels: string[]; // GitLab labels/tags
 }
 
 export interface AppConfig {
@@ -50,7 +51,7 @@ export interface AppConfig {
   autoRefreshInterval: number;
   myAccount: string;
   teamAccounts: string[];
-  fetchTimeUnit: 'days' | 'weeks';
+  fetchTimeUnit: "days" | "weeks";
   fetchTimeValue: number;
   fetchClosedMRs: boolean;
 }
@@ -79,6 +80,7 @@ export interface GitLabMR {
     avatar_url: string;
   };
   path_with_namespace?: string;
+  labels?: string[]; // GitLab labels/tags
 }
 
 export interface GitLabApproval {
@@ -114,4 +116,3 @@ export interface GitLabNote {
   created_at: string;
   system: boolean;
 }
-

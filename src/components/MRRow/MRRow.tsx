@@ -35,11 +35,10 @@ export function MRRow({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleMRClick}
-              className={`hover:underline ${
-                hasNewComments
-                  ? 'text-blue-700 font-bold'
-                  : 'text-blue-600 font-medium'
-              } hover:text-blue-800`}
+              className={`hover:underline ${hasNewComments
+                ? 'text-blue-700 font-bold'
+                : 'text-blue-600 font-medium'
+                } hover:text-blue-800`}
             >
               {mr.title}
             </a>
@@ -49,6 +48,7 @@ export function MRRow({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead
               </span>
             )}
           </div>
+          {/* MR Tags/Labels are shown in the dedicated Labels column for desktop table */}
           <div className="text-sm text-gray-500 flex items-center gap-2 flex-wrap">
             {repoParts ? (
               <span className="flex items-center gap-1">
@@ -113,6 +113,25 @@ export function MRRow({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead
             </button>
           )}
         </div>
+      </td>
+
+      {/* Labels Column */}
+      <td className="px-4 py-3">
+        {mr.labels && mr.labels.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {mr.labels.map((label) => (
+              <span
+                key={label}
+                className="inline-block bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-yellow-200"
+                title={label}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className="text-sm text-gray-400">—</span>
+        )}
       </td>
     </tr>
   );
