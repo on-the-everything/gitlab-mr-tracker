@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { useConfig } from './hooks/useConfig';
 import { useMRData } from './hooks/useMRData';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
@@ -31,7 +32,7 @@ function App() {
   } = useMRData(config);
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const [view, setView] = useState<'home' | 'merged-uat'>('home');
+  const navigate = useNavigate();
   const [statusFilters, setStatusFilters] = useState<Record<MRStatus, boolean>>(() => {
     const filters = storage.getStatusFilters();
     // If fetchClosedMRs is disabled, ensure rejected and merged are unchecked
@@ -178,13 +179,13 @@ function App() {
               >
                 🔄 Refresh
               </button>
-              <button
-                onClick={() => setView('merged-uat')}
+              <Link
+                to="/merged-uat"
                 className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors"
                 title="Show merged MRs waiting for UAT"
               >
                 🎯 Merged → UAT
-              </button>
+              </Link>
               <button
                 onClick={() => setIsConfigOpen(true)}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
@@ -223,52 +224,61 @@ function App() {
           fetchClosedMRs={config.fetchClosedMRs}
         />
 
-        {/* Views */}
-        {view === 'home' ? (
-          <>
-            {myMRs.length > 0 && (
-              <MRTable
-                title="My MRs"
-                mrList={myMRs}
-                onMarkAsRead={markMRAsRead}
-                onMarkAsUnread={markMRAsUnread}
-                hasNewComments={hasNewComments}
-                isRead={isRead}
-              />
-            )}
+        <Routes>
+          <Route
+            path="/"
+            element={(
+              <>
+                {myMRs.length > 0 && (
+                  <MRTable
+                    title="My MRs"
+                    mrList={myMRs}
+                    onMarkAsRead={markMRAsRead}
+                    onMarkAsUnread={markMRAsUnread}
+                    hasNewComments={hasNewComments}
+                    isRead={isRead}
+                  />
+                )}
 
-            {teamMRs.length > 0 && (
-              <MRTable
-                title="Team MRs"
-                mrList={teamMRs}
-                onMarkAsRead={markMRAsRead}
-                onMarkAsUnread={markMRAsUnread}
-                hasNewComments={hasNewComments}
-                isRead={isRead}
-              />
-            )}
+                {teamMRs.length > 0 && (
+                  <MRTable
+                    title="Team MRs"
+                    mrList={teamMRs}
+                    onMarkAsRead={markMRAsRead}
+                    onMarkAsUnread={markMRAsUnread}
+                    hasNewComments={hasNewComments}
+                    isRead={isRead}
+                  />
+                )}
 
-            {otherMRs.length > 0 && (
-              <MRTable
-                title="Other MRs"
-                mrList={otherMRs}
-                onMarkAsRead={markMRAsRead}
-                onMarkAsUnread={markMRAsUnread}
-                hasNewComments={hasNewComments}
-                isRead={isRead}
-              />
+                {otherMRs.length > 0 && (
+                  <MRTable
+                    title="Other MRs"
+                    mrList={otherMRs}
+                    onMarkAsRead={markMRAsRead}
+                    onMarkAsUnread={markMRAsUnread}
+                    hasNewComments={hasNewComments}
+                    isRead={isRead}
+                  />
+                )}
+              </>
             )}
-          </>
-        ) : (
-          <MergedUATPage
-            mrList={mrList}
-            onMarkAsRead={markMRAsRead}
-            onMarkAsUnread={markMRAsUnread}
-            hasNewComments={(mr) => hasNewComments(mr)}
-            isRead={(id) => isRead(id)}
-            onBack={() => setView('home')}
           />
-        )}
+
+          <Route
+            path="/merged-uat"
+            element={(
+              <MergedUATPage
+                mrList={mrList}
+                onMarkAsRead={markMRAsRead}
+                onMarkAsUnread={markMRAsUnread}
+                hasNewComments={(mr) => hasNewComments(mr)}
+                isRead={(id) => isRead(id)}
+                onBack={() => navigate('/')}
+              />
+            )}
+          />
+        </Routes>
 
         {/* Empty State */}
         {myMRs.length === 0 && teamMRs.length === 0 && otherMRs.length === 0 && (
