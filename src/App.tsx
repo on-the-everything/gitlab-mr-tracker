@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { useConfig } from './hooks/useConfig';
 import { useMRData } from './hooks/useMRData';
@@ -53,6 +53,15 @@ function App() {
 
   // Label filters state (multiple chips)
   const [labelFilters, setLabelFilters] = useState<string[]>([]);
+  const [selectedRepository, setSelectedRepository] = useState<string>('');
+
+  const repositories = useMemo(() => {
+    try {
+      return Array.from(new Set(mrList.map((m) => m.repository))).sort();
+    } catch {
+      return [] as string[];
+    }
+  }, [mrList]);
 
   // Update status filters when fetchClosedMRs changes
   useEffect(() => {
@@ -150,6 +159,11 @@ function App() {
   let teamMRs = [] as typeof categorized.team;
   let otherMRs = [] as typeof categorized.other;
 
+  const applyRepoFilter = (mrs: typeof categorized.my) => {
+    if (!selectedRepository) return mrs;
+    return mrs.filter((mr) => mr.repository === selectedRepository);
+  };
+
   if (labelFilters && labelFilters.length > 0) {
     const needles = labelFilters.map((f) => f.trim().toLowerCase()).filter(Boolean);
     const filteredList = mrList.filter((mr) => {
@@ -159,13 +173,13 @@ function App() {
 
     const categorizedFiltered = categorizeMRs(filteredList);
 
-    myMRs = filterByStatus(filterByClosedMRs(categorizedFiltered.my, true));
-    teamMRs = filterByStatus(filterByClosedMRs(categorizedFiltered.team, true));
-    otherMRs = filterByStatus(filterByClosedMRs(categorizedFiltered.other, false));
+    myMRs = applyRepoFilter(filterByStatus(filterByClosedMRs(categorizedFiltered.my, true)));
+    teamMRs = applyRepoFilter(filterByStatus(filterByClosedMRs(categorizedFiltered.team, true)));
+    otherMRs = applyRepoFilter(filterByStatus(filterByClosedMRs(categorizedFiltered.other, false)));
   } else {
-    myMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.my, true), true)));
-    teamMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.team, true), true)));
-    otherMRs = filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.other, false), false)));
+    myMRs = applyRepoFilter(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.my, true), true))));
+    teamMRs = applyRepoFilter(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.team, true), true))));
+    otherMRs = applyRepoFilter(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.other, false), false))));
   }
 
   const handleConfigSave = (newConfig: typeof config) => {
@@ -246,6 +260,9 @@ function App() {
           statusFilters={statusFilters}
           onStatusFilterChange={handleStatusFilterChange}
           fetchClosedMRs={config.fetchClosedMRs}
+          repositoryList={repositories}
+          selectedRepository={selectedRepository}
+          onRepositoryChange={(r) => setSelectedRepository(r)}
           labelFilters={labelFilters}
           onAddLabel={(v) => setLabelFilters((prev) => prev.includes(v) ? prev : [...prev, v])}
           onRemoveLabel={(v) => setLabelFilters((prev) => prev.filter((p) => p !== v))}
@@ -315,6 +332,7 @@ function App() {
                 onBack={() => navigate('/')}
                 labelFilters={labelFilters}
                 onLabelClick={(label) => setLabelFilters((prev) => prev.includes(label) ? prev : [...prev, label])}
+                selectedRepository={selectedRepository}
               />
             )}
           />

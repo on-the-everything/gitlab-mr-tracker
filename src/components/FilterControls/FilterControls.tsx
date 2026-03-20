@@ -5,6 +5,9 @@ interface FilterControlsProps {
   statusFilters: Record<MRStatus, boolean>;
   onStatusFilterChange: (status: MRStatus, visible: boolean) => void;
   fetchClosedMRs: boolean;
+  repositoryList?: string[];
+  selectedRepository?: string;
+  onRepositoryChange?: (repo: string) => void;
   labelFilters?: string[];
   onAddLabel?: (value: string) => void;
   onRemoveLabel?: (value: string) => void;
@@ -27,6 +30,9 @@ export function FilterControls({
   statusFilters,
   onStatusFilterChange,
   fetchClosedMRs,
+  repositoryList,
+  selectedRepository,
+  onRepositoryChange,
   labelFilters,
   onAddLabel,
   onRemoveLabel,
@@ -116,6 +122,21 @@ export function FilterControls({
                 </button>
               </span>
             ))}
+          </div>
+        )}
+        {repositoryList && repositoryList.length > 0 && (
+          <div className="flex items-center gap-2 w-full mt-2">
+            <label className="text-sm font-medium text-gray-700">Repository:</label>
+            <select
+              value={selectedRepository ?? ''}
+              onChange={(e) => onRepositoryChange && onRepositoryChange(e.target.value)}
+              className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All repositories</option>
+              {repositoryList.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
           </div>
         )}
         <div className="flex items-center gap-2 ml-2">

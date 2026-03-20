@@ -10,15 +10,21 @@ interface MergedUATPageProps {
     onBack: () => void;
     labelFilters?: string[];
     onLabelClick?: (label: string) => void;
+    selectedRepository?: string;
 }
 
 const isWaitingUATLabel = (label: string) => {
     return /\b(uat)\b/i.test(label) || /waiting.*uat/i.test(label) || /wait.*uat/i.test(label);
 };
 
-export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilters, onLabelClick }: MergedUATPageProps) {
+export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilters, onLabelClick, selectedRepository }: MergedUATPageProps) {
     // Default: show all merged MRs. If `labelFilters` are provided, apply them.
     let mergedWaiting = mrList.filter((mr) => mr.status === MRStatus.MERGED);
+
+    // Repository filter
+    if (selectedRepository) {
+        mergedWaiting = mergedWaiting.filter((mr) => mr.repository === selectedRepository);
+    }
 
     // If label filters are provided, further filter the list using local data (OR semantics)
     if (labelFilters && labelFilters.length > 0) {
