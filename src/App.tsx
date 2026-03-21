@@ -3,13 +3,13 @@ import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { useConfig } from './hooks/useConfig';
 import { useMRData } from './hooks/useMRData';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
-import { AddMRInput } from './components/AddMRInput/AddMRInput';
+import NavBar from './components/NavBar/NavBar';
 import { ConfigModal } from './components/ConfigModal/ConfigModal';
 import { MRTable } from './components/MRTable/MRTable';
 import { FilterControls } from './components/FilterControls/FilterControls';
 import MergedUATPage from './pages/MergedUATPage';
 import CompareBranchesPage from './pages/CompareBranchesPage';
-import { formatTimeAgo } from './utils/timeFormatter';
+
 import { MRStatus } from './types';
 import { storage } from './services/storage';
 
@@ -203,65 +203,15 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold text-gray-900">
-              <Link to="/" className="hover:underline">GitLab MR Tracker</Link>
-            </h1>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleRefreshClick}
-                disabled={loading}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
-                title="Refresh all merge requests"
-              >
-                🔄 Refresh
-              </button>
-              <Link
-                to="/merged-uat"
-                className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors"
-                title="Show merged MRs waiting for UAT"
-              >
-                🎯 Merged → UAT
-              </Link>
-              <Link
-                to="/compare-develop-master"
-                className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors"
-                title="Compare develop → master"
-              >
-                🔀 Compare develop → master
-              </Link>
-              <button
-                onClick={() => setIsConfigOpen(true)}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
-                title="Configuration"
-              >
-                ⚙️
-              </button>
-            </div>
-          </div>
-
-          {/* Add Custom MR Input */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Add Custom MR
-            </label>
-            <AddMRInput
-              onAdd={addMR}
-              loading={loading}
-              error={error}
-              onErrorClear={() => setError(null)}
-            />
-          </div>
-
-          {/* Last Updated */}
-          {lastUpdated && (
-            <div className="text-sm text-gray-500">
-              Last updated: {formatTimeAgo(lastUpdated)}
-            </div>
-          )}
-        </div>
+        <NavBar
+          addMR={addMR}
+          loading={loading}
+          error={error}
+          onErrorClear={() => setError(null)}
+          lastUpdated={lastUpdated}
+          onRefresh={handleRefreshClick}
+          onOpenConfig={() => setIsConfigOpen(true)}
+        />
 
         {/* Filter Controls */}
         <FilterControls
