@@ -16,10 +16,6 @@ interface MergedUATPageProps {
     selectedRepository?: string;
 }
 
-const isWaitingUATLabel = (label: string) => {
-    return /\b(uat)\b/i.test(label) || /waiting.*uat/i.test(label) || /wait.*uat/i.test(label);
-};
-
 export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilters, onLabelClick, selectedRepository }: MergedUATPageProps) {
     const { config } = useConfig();
     const [exportVisible, setExportVisible] = useState(false);
