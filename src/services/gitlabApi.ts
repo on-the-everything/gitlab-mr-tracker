@@ -161,6 +161,7 @@ export async function fetchMergeRequest(
     projectId: mrData.project_id,
     iid: mrData.iid,
     title: mrData.title,
+    description: (mrData as any).description || undefined,
     repository: parsedUrl.projectPath,
     sourceBranch: (mrData as any).source_branch || undefined,
     status,

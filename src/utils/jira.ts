@@ -1,8 +1,13 @@
-export function extractJiraTicket(branchName?: string): string | null {
-  if (!branchName) return null;
-  // Common Jira ticket pattern: ABC-123 or ABCD-1234 (upper-case project key)
-  const match = branchName.match(/([A-Z][A-Z0-9]+-\d+)/);
-  return match ? match[1] : null;
+export function extractJiraTicket(
+  ...sources: Array<string | undefined | null>
+): string | null {
+  const pattern = /([A-Z][A-Z0-9]+-\d+)/i;
+  for (const src of sources) {
+    if (!src) continue;
+    const match = src.match(pattern);
+    if (match && match[1]) return match[1].toUpperCase();
+  }
+  return null;
 }
 
 export function buildJiraTicketUrl(

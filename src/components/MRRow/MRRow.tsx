@@ -27,7 +27,7 @@ export function MRRow({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead
 
   const repoParts = splitRepositoryPath(mr.repository);
   const { config } = useConfig();
-  const ticket = extractJiraTicket(mr.sourceBranch || mr.title);
+  const ticket = extractJiraTicket(mr.sourceBranch, mr.title, (mr as any).description);
   const jiraUrl = ticket ? buildJiraTicketUrl(ticket, config.jiraHost) : null;
 
   return (

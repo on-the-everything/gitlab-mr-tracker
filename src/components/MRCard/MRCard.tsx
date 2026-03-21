@@ -26,7 +26,7 @@ export function MRCard({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRea
 
   const repoParts = splitRepositoryPath(mr.repository);
   const { config } = useConfig();
-  const ticket = extractJiraTicket(mr.sourceBranch || mr.title);
+  const ticket = extractJiraTicket(mr.sourceBranch, mr.title, (mr as any).description);
   const jiraUrl = ticket ? buildJiraTicketUrl(ticket, config.jiraHost) : null;
 
   return (
@@ -41,8 +41,8 @@ export function MRCard({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRea
               rel="noopener noreferrer"
               onClick={handleMRClick}
               className={`hover:underline ${hasNewComments
-                  ? 'text-blue-700 font-bold'
-                  : 'text-blue-600 font-medium'
+                ? 'text-blue-700 font-bold'
+                : 'text-blue-600 font-medium'
                 } hover:text-blue-800`}
             >
               {mr.title}

@@ -34,6 +34,7 @@ export interface MergeRequest {
   iid: number;
   title: string;
   repository: string;
+  description?: string;
   sourceBranch?: string;
   status: MRStatus;
   statusUpdatedAt: string;
@@ -69,6 +70,7 @@ export interface GitLabMR {
   iid: number;
   project_id: number;
   title: string;
+  description?: string;
   state: string;
   web_url: string;
   created_at: string;
