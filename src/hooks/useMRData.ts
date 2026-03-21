@@ -1,10 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
-import { MergeRequest, AppConfig, MRStatus } from '../types';
-import { storage } from '../services/storage';
-import { fetchMergeRequest, updateMergeRequest, fetchMRsByAuthor, GitLabAPIError } from '../services/gitlabApi';
-import { parseMRUrl } from '../utils/urlParser';
+import { useState, useEffect, useCallback } from "react";
+import { MergeRequest, AppConfig, MRStatus } from "../types";
+import { storage } from "../services/storage";
+import {
+  fetchMergeRequest,
+  updateMergeRequest,
+  fetchMRsByAuthor,
+  GitLabAPIError,
+} from "../services/gitlabApi";
+import { parseMRUrl } from "../utils/urlParser";
 
-export type MRCategory = 'my' | 'team' | 'other';
+export type MRCategory = "my" | "team" | "other";
 
 export interface CategorizedMRs {
   my: MergeRequest[];
@@ -13,8 +18,19 @@ export interface CategorizedMRs {
 }
 
 export function useMRData(config: AppConfig) {
+  // Ensure MR lists are always sorted newest-first by `createdAt`
+  const sortMRsNewestFirst = (
+    list: MergeRequest[] | undefined | null,
+  ): MergeRequest[] => {
+    const arr = Array.isArray(list) ? list.slice() : [];
+    return arr.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  };
+
   const [mrList, setMRList] = useState<MergeRequest[]>(() => {
-    return storage.getMRList();
+    return sortMRsNewestFirst(storage.getMRList());
   });
 
   const [lastUpdated, setLastUpdated] = useState<string | null>(() => {
@@ -23,7 +39,9 @@ export function useMRData(config: AppConfig) {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [readTimestamps, setReadTimestamps] = useState<Record<string, string>>(() => storage.getMRReadTimestamps());
+  const [readTimestamps, setReadTimestamps] = useState<Record<string, string>>(
+    () => storage.getMRReadTimestamps(),
+  );
 
   // Save to storage whenever MR list changes
   useEffect(() => {
@@ -32,106 +50,126 @@ export function useMRData(config: AppConfig) {
 
   // Helper to normalize username (remove @ if present, lowercase)
   const normalizeUsername = (username: string): string => {
-    return username.startsWith('@') ? username.slice(1).toLowerCase() : username.toLowerCase();
+    return username.startsWith("@")
+      ? username.slice(1).toLowerCase()
+      : username.toLowerCase();
   };
 
   // Categorize MRs
-  const categorizeMRs = useCallback((mrs: MergeRequest[]): CategorizedMRs => {
-    const myUsername = normalizeUsername(config.myAccount);
-    const teamUsernames = config.teamAccounts.map(normalizeUsername);
+  const categorizeMRs = useCallback(
+    (mrs: MergeRequest[]): CategorizedMRs => {
+      const myUsername = normalizeUsername(config.myAccount);
+      const teamUsernames = config.teamAccounts.map(normalizeUsername);
 
-    const categorized: CategorizedMRs = {
-      my: [],
-      team: [],
-      other: [],
-    };
+      const categorized: CategorizedMRs = {
+        my: [],
+        team: [],
+        other: [],
+      };
 
-    mrs.forEach((mr) => {
-      const authorUsername = normalizeUsername(mr.author.username);
-      
-      if (myUsername && authorUsername === myUsername) {
-        categorized.my.push(mr);
-      } else if (teamUsernames.length > 0 && teamUsernames.includes(authorUsername)) {
-        categorized.team.push(mr);
-      } else {
-        categorized.other.push(mr);
-      }
-    });
+      mrs.forEach((mr) => {
+        const authorUsername = normalizeUsername(mr.author.username);
 
-    // Sort by created time (newer first)
-    const sortByCreated = (a: MergeRequest, b: MergeRequest) => {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    };
-
-    categorized.my.sort(sortByCreated);
-    categorized.team.sort(sortByCreated);
-    categorized.other.sort(sortByCreated);
-
-    return categorized;
-  }, [config.myAccount, config.teamAccounts]);
-
-  const addMR = useCallback(async (url: string) => {
-    setError(null);
-    setLoading(true);
-
-    try {
-      const parsedUrl = parseMRUrl(url);
-      if (!parsedUrl) {
-        throw new Error('Invalid GitLab merge request URL');
-      }
-
-      // Check for duplicates
-      const existing = mrList.find((mr) => mr.url === url);
-      if (existing) {
-        throw new Error('This merge request is already in the list');
-      }
-
-      // Check if config is valid
-      if (!config.accessToken) {
-        throw new Error('Please configure your GitLab access token first');
-      }
-
-      const mr = await fetchMergeRequest(config, parsedUrl);
-      setMRList((prev) => [mr, ...prev]);
-      setLastUpdated(new Date().toISOString());
-      storage.saveLastUpdated(new Date().toISOString());
-    } catch (err) {
-      if (err instanceof GitLabAPIError) {
-        if (err.statusCode === 401) {
-          setError('Invalid or expired access token. Please check your configuration.');
-        } else if (err.statusCode === 404) {
-          setError('Merge request not found or you do not have access.');
+        if (myUsername && authorUsername === myUsername) {
+          categorized.my.push(mr);
+        } else if (
+          teamUsernames.length > 0 &&
+          teamUsernames.includes(authorUsername)
+        ) {
+          categorized.team.push(mr);
         } else {
-          setError(err.message);
+          categorized.other.push(mr);
         }
-      } else if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Failed to add merge request');
+      });
+
+      // Sort by created time (newer first)
+      const sortByCreated = (a: MergeRequest, b: MergeRequest) => {
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      };
+
+      categorized.my.sort(sortByCreated);
+      categorized.team.sort(sortByCreated);
+      categorized.other.sort(sortByCreated);
+
+      return categorized;
+    },
+    [config.myAccount, config.teamAccounts],
+  );
+
+  const addMR = useCallback(
+    async (url: string) => {
+      setError(null);
+      setLoading(true);
+
+      try {
+        const parsedUrl = parseMRUrl(url);
+        if (!parsedUrl) {
+          throw new Error("Invalid GitLab merge request URL");
+        }
+
+        // Check for duplicates
+        const existing = mrList.find((mr) => mr.url === url);
+        if (existing) {
+          throw new Error("This merge request is already in the list");
+        }
+
+        // Check if config is valid
+        if (!config.accessToken) {
+          throw new Error("Please configure your GitLab access token first");
+        }
+
+        const mr = await fetchMergeRequest(config, parsedUrl);
+        setMRList((prev) => sortMRsNewestFirst([mr, ...prev]));
+        setLastUpdated(new Date().toISOString());
+        storage.saveLastUpdated(new Date().toISOString());
+      } catch (err) {
+        if (err instanceof GitLabAPIError) {
+          if (err.statusCode === 401) {
+            setError(
+              "Invalid or expired access token. Please check your configuration.",
+            );
+          } else if (err.statusCode === 404) {
+            setError("Merge request not found or you do not have access.");
+          } else {
+            setError(err.message);
+          }
+        } else if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Failed to add merge request");
+        }
+        throw err;
+      } finally {
+        setLoading(false);
       }
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [config, mrList]);
+    },
+    [config, mrList],
+  );
 
   const removeMR = useCallback((id: string) => {
     setMRList((prev) => prev.filter((mr) => mr.id !== id));
   }, []);
 
-  const refreshMR = useCallback(async (mr: MergeRequest) => {
-    try {
-      if (!config.accessToken) {
-        return;
+  const refreshMR = useCallback(
+    async (mr: MergeRequest) => {
+      try {
+        if (!config.accessToken) {
+          return;
+        }
+        const updated = await updateMergeRequest(config, mr);
+        setMRList((prev) =>
+          sortMRsNewestFirst(
+            prev.map((item) => (item.id === mr.id ? updated : item)),
+          ),
+        );
+      } catch (err) {
+        console.error("Failed to refresh MR:", err);
       }
-      const updated = await updateMergeRequest(config, mr);
-      setMRList((prev) =>
-        prev.map((item) => (item.id === mr.id ? updated : item))
-      );
-    } catch (err) {
-      console.error('Failed to refresh MR:', err);
-    }
-  }, [config]);
+    },
+    [config],
+  );
 
   const refreshAll = useCallback(async () => {
     if (!config.accessToken || mrList.length === 0) {
@@ -143,22 +181,22 @@ export function useMRData(config: AppConfig) {
 
     try {
       const updates = await Promise.allSettled(
-        mrList.map((mr) => updateMergeRequest(config, mr))
+        mrList.map((mr) => updateMergeRequest(config, mr)),
       );
 
       const updatedList = updates.map((result, index) => {
-        if (result.status === 'fulfilled') {
+        if (result.status === "fulfilled") {
           return result.value;
         }
         return mrList[index];
       });
 
-      setMRList(updatedList);
+      setMRList(sortMRsNewestFirst(updatedList));
       setLastUpdated(new Date().toISOString());
       storage.saveLastUpdated(new Date().toISOString());
     } catch (err) {
-      console.error('Failed to refresh MRs:', err);
-      setError('Failed to refresh some merge requests');
+      console.error("Failed to refresh MRs:", err);
+      setError("Failed to refresh some merge requests");
     } finally {
       setLoading(false);
     }
@@ -166,7 +204,7 @@ export function useMRData(config: AppConfig) {
 
   const subscribeToAccounts = useCallback(async () => {
     if (!config.accessToken) {
-      setError('Please configure your GitLab access token first');
+      setError("Please configure your GitLab access token first");
       return;
     }
 
@@ -198,7 +236,7 @@ export function useMRData(config: AppConfig) {
             }
           });
         } catch (err) {
-          console.error('Failed to fetch my account MRs:', err);
+          console.error("Failed to fetch my account MRs:", err);
         }
       }
 
@@ -233,23 +271,26 @@ export function useMRData(config: AppConfig) {
         const authorUsername = normalizeUsername(mr.author.username);
         const myUsername = normalizeUsername(config.myAccount);
         const teamUsernames = config.teamAccounts.map(normalizeUsername);
-        
-        return authorUsername !== myUsername && !teamUsernames.includes(authorUsername);
+
+        return (
+          authorUsername !== myUsername &&
+          !teamUsernames.includes(authorUsername)
+        );
       });
 
-      setMRList([...existingMRs, ...allMRs]);
+      setMRList(sortMRsNewestFirst([...existingMRs, ...allMRs]));
       setLastUpdated(new Date().toISOString());
       storage.saveLastUpdated(new Date().toISOString());
     } catch (err) {
-      console.error('Failed to subscribe to accounts:', err);
-      setError('Failed to fetch MRs from configured accounts');
+      console.error("Failed to subscribe to accounts:", err);
+      setError("Failed to fetch MRs from configured accounts");
     } finally {
       setLoading(false);
     }
   }, [config, mrList]);
 
   const updateMRList = useCallback((updated: MergeRequest[]) => {
-    setMRList(updated);
+    setMRList(sortMRsNewestFirst(updated));
     setLastUpdated(new Date().toISOString());
     storage.saveLastUpdated(new Date().toISOString());
   }, []);
@@ -277,27 +318,33 @@ export function useMRData(config: AppConfig) {
     });
   }, []);
 
-  const hasNewComments = useCallback((mr: MergeRequest): boolean => {
-    const lastReadAt = readTimestamps[mr.id];
-    if (!lastReadAt) {
-      // If never read, consider it as new/unread
-      // For New status MRs (no comments), they should be considered "new" if never read
-      // For MRs with comments, they should be considered "new" if never read
-      return true;
-    }
-    // If MR has no comments (New status), it's considered "new" if never read
-    // If it has been read, it's no longer "new" unless there are new comments
-    if (!mr.latestCommentAt) {
-      // New status MR: if it's been read, it's no longer "new"
-      return false;
-    }
-    // MR with comments: check if latest comment is after last read
-    return new Date(mr.latestCommentAt) > new Date(lastReadAt);
-  }, [readTimestamps]);
+  const hasNewComments = useCallback(
+    (mr: MergeRequest): boolean => {
+      const lastReadAt = readTimestamps[mr.id];
+      if (!lastReadAt) {
+        // If never read, consider it as new/unread
+        // For New status MRs (no comments), they should be considered "new" if never read
+        // For MRs with comments, they should be considered "new" if never read
+        return true;
+      }
+      // If MR has no comments (New status), it's considered "new" if never read
+      // If it has been read, it's no longer "new" unless there are new comments
+      if (!mr.latestCommentAt) {
+        // New status MR: if it's been read, it's no longer "new"
+        return false;
+      }
+      // MR with comments: check if latest comment is after last read
+      return new Date(mr.latestCommentAt) > new Date(lastReadAt);
+    },
+    [readTimestamps],
+  );
 
-  const isRead = useCallback((mrId: string): boolean => {
-    return !!readTimestamps[mrId];
-  }, [readTimestamps]);
+  const isRead = useCallback(
+    (mrId: string): boolean => {
+      return !!readTimestamps[mrId];
+    },
+    [readTimestamps],
+  );
 
   return {
     mrList,
