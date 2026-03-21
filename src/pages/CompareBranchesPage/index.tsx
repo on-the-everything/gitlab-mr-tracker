@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MRTable } from '../../components/MRTable/MRTable';
 import { useConfig } from '../../hooks/useConfig';
-import { fetchMergeRequestsByBranches } from '../../services/gitlabApi';
+import { fetchMergeRequestsByBranches, fetchRepositoryCompare } from '../../services/gitlabApi';
 import { MergeRequest } from '../../types';
 
 interface Props {
@@ -20,6 +20,9 @@ export function CompareBranchesPage({ onMarkAsRead, onMarkAsUnread, hasNewCommen
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [repoFilter, setRepoFilter] = useState<string>(selectedRepository || '');
+    const [compareDiffs, setCompareDiffs] = useState<any[]>([]);
+    const [loadingCompare, setLoadingCompare] = useState(false);
+    const [compareError, setCompareError] = useState<string | null>(null);
 
     useEffect(() => {
         let mounted = true;
@@ -60,6 +63,38 @@ export function CompareBranchesPage({ onMarkAsRead, onMarkAsUnread, hasNewCommen
             setList(allMRs.filter((mr) => mr.repository === repoFilter));
         }
     }, [allMRs, repoFilter]);
+
+    // Fetch compare diffs for the selected repository (master -> develop)
+    useEffect(() => {
+        let mounted = true;
+        const loadCompare = async () => {
+            if (!repoFilter) {
+                setCompareDiffs([]);
+                setCompareError(null);
+                setLoadingCompare(false);
+                return;
+            }
+
+            setLoadingCompare(true);
+            setCompareError(null);
+            try {
+                const diffs = await fetchRepositoryCompare(config, repoFilter, 'master', 'develop');
+                if (!mounted) return;
+                setCompareDiffs(diffs || []);
+            } catch (err: any) {
+                if (!mounted) return;
+                setCompareError(err?.message || 'Failed to fetch compare diffs');
+                setCompareDiffs([]);
+            } finally {
+                if (mounted) setLoadingCompare(false);
+            }
+        };
+
+        loadCompare();
+        return () => {
+            mounted = false;
+        };
+    }, [config, repoFilter]);
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -103,6 +138,36 @@ export function CompareBranchesPage({ onMarkAsRead, onMarkAsUnread, hasNewCommen
 
                 {error && (
                     <div className="text-center py-6 text-red-600 bg-white rounded-lg shadow-sm border border-red-100">{error}</div>
+                )}
+
+                {/* Compare diffs panel for selected repository */}
+                {repoFilter && (
+                    <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <h2 className="text-lg font-semibold text-gray-800">Changes (master → develop)</h2>
+                        {loadingCompare && (
+                            <div className="text-sm text-gray-500 py-2">Loading changes...</div>
+                        )}
+                        {compareError && (
+                            <div className="text-sm text-red-600 py-2">{compareError}</div>
+                        )}
+                        {!loadingCompare && !compareError && compareDiffs.length === 0 && (
+                            <div className="text-sm text-gray-500 py-2">No file changes found between branches.</div>
+                        )}
+                        {!loadingCompare && !compareError && compareDiffs.length > 0 && (
+                            <div className="mt-3 grid gap-2 max-h-56 overflow-auto">
+                                {compareDiffs.map((d: any, idx: number) => {
+                                    const name = d.new_path || d.old_path || 'unknown';
+                                    const type = d.new_file ? 'Added' : d.deleted_file ? 'Deleted' : d.renamed_file ? 'Renamed' : 'Modified';
+                                    return (
+                                        <div key={idx} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded">
+                                            <div className="text-sm text-gray-800">{name}</div>
+                                            <div className="text-xs text-gray-500">{type}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 {!loading && !error && list.length === 0 && (

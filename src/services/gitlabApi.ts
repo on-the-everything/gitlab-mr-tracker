@@ -385,3 +385,28 @@ export async function fetchMergeRequestsByBranches(
     throw error;
   }
 }
+
+// Fetch repository compare (diffs) between two refs (from -> to)
+export async function fetchRepositoryCompare(
+  config: AppConfig,
+  projectPath: string,
+  from: string,
+  to: string,
+): Promise<any[]> {
+  const encodedProject = encodeURIComponent(projectPath);
+  const baseUrl = `${config.gitlabHost.replace(/\/$/, "")}/api/v4/projects/${encodedProject}`;
+  const url = `${baseUrl}/repository/compare?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+
+  try {
+    const response = await fetchGitLabAPI(url, config.accessToken);
+    const compareData = await response.json();
+    // GitLab compare response includes `diffs` array describing changed files
+    return compareData.diffs || [];
+  } catch (error) {
+    console.error(
+      `Failed to fetch repository compare for ${projectPath}:`,
+      error,
+    );
+    throw error;
+  }
+}
