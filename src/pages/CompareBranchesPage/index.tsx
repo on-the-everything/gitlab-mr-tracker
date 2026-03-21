@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MRTable } from '../../components/MRTable/MRTable';
 import { useConfig } from '../../hooks/useConfig';
 import { fetchMergeRequestsByBranches, fetchRepositoryCompare } from '../../services/gitlabApi';

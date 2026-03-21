@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useConfig } from './hooks/useConfig';
 import { useMRData } from './hooks/useMRData';
 import { useAutoRefresh } from './hooks/useAutoRefresh';

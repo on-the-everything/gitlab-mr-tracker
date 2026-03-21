@@ -7,7 +7,7 @@ interface NavBarProps {
     loading: boolean;
     error: string | null;
     onErrorClear: () => void;
-    lastUpdated: Date | null;
+    lastUpdated: string | null;
     onRefresh: () => void;
     onOpenConfig: () => void;
 }
