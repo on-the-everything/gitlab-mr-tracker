@@ -15,9 +15,11 @@ interface Props {
 
 export function CompareBranchesPage({ onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, selectedRepository }: Props) {
     const { config } = useConfig();
+    const [allMRs, setAllMRs] = useState<MergeRequest[]>([]);
     const [list, setList] = useState<MergeRequest[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [repoFilter, setRepoFilter] = useState<string>(selectedRepository || '');
 
     useEffect(() => {
         let mounted = true;
@@ -27,11 +29,11 @@ export function CompareBranchesPage({ onMarkAsRead, onMarkAsUnread, hasNewCommen
             try {
                 const mrs = await fetchMergeRequestsByBranches(config, 'develop', 'master');
                 if (!mounted) return;
-                let filtered = mrs;
-                if (selectedRepository) {
-                    filtered = filtered.filter((mr) => mr.repository === selectedRepository);
-                }
-                setList(filtered);
+                setAllMRs(mrs);
+                const initialFiltered = selectedRepository
+                    ? mrs.filter((mr) => mr.repository === selectedRepository)
+                    : mrs;
+                setList(initialFiltered);
             } catch (err: any) {
                 setError(err?.message || 'Failed to load merge requests');
             } finally {
@@ -45,6 +47,20 @@ export function CompareBranchesPage({ onMarkAsRead, onMarkAsUnread, hasNewCommen
         };
     }, [config, selectedRepository]);
 
+    // Keep local repo filter in sync when parent prop changes
+    useEffect(() => {
+        setRepoFilter(selectedRepository || '');
+    }, [selectedRepository]);
+
+    // Recompute visible list when allMRs or repoFilter changes
+    useEffect(() => {
+        if (!repoFilter) {
+            setList(allMRs);
+        } else {
+            setList(allMRs.filter((mr) => mr.repository === repoFilter));
+        }
+    }, [allMRs, repoFilter]);
+
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -57,14 +73,27 @@ export function CompareBranchesPage({ onMarkAsRead, onMarkAsUnread, hasNewCommen
                         {onBack && (
                             <button onClick={onBack} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">← Back</button>
                         )}
-                        <a
-                            href={`${config.gitlabHost.replace(/\/$/, '')}/-/compare/master...develop`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            Open GitLab Compare
-                        </a>
+                        {(() => {
+                            const repoPathRaw = repoFilter ? repoFilter : '';
+                            const repoPath = repoPathRaw.replace(/^\/+|\/+$/g, '');
+                            const encodedRepoPath = repoPath
+                                ? repoPath.split('/').map((seg) => encodeURIComponent(seg)).join('/')
+                                : '';
+                            const compareUrl = encodedRepoPath
+                                ? `${config.gitlabHost.replace(/\/$/, '')}/${encodedRepoPath}/-/compare/master...develop`
+                                : '';
+
+                            return (
+                                <button
+                                    onClick={() => compareUrl && window.open(compareUrl, '_blank', 'noopener')}
+                                    disabled={!compareUrl}
+                                    title={compareUrl ? 'Open GitLab compare: develop → master' : 'No repository selected'}
+                                    className={`px-4 py-2 rounded-lg transition-colors ${compareUrl ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                                >
+                                    Open GitLab Compare
+                                </button>
+                            );
+                        })()}
                     </div>
                 </div>
 
