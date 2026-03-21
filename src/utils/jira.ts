@@ -1,13 +1,26 @@
+export function extractJiraTickets(
+  ...sources: Array<string | undefined | null>
+): string[] {
+  const pattern = /([A-Z][A-Z0-9]+-\d+)/gi;
+  const found = new Set<string>();
+  for (const src of sources) {
+    if (!src) continue;
+    const matches = src.match(pattern);
+    if (matches) {
+      for (const m of matches) {
+        found.add(m.toUpperCase());
+      }
+    }
+  }
+  return Array.from(found);
+}
+
+// Backwards-compatible single-ticket helper
 export function extractJiraTicket(
   ...sources: Array<string | undefined | null>
 ): string | null {
-  const pattern = /([A-Z][A-Z0-9]+-\d+)/i;
-  for (const src of sources) {
-    if (!src) continue;
-    const match = src.match(pattern);
-    if (match && match[1]) return match[1].toUpperCase();
-  }
-  return null;
+  const tickets = extractJiraTickets(...sources);
+  return tickets.length > 0 ? tickets[0] : null;
 }
 
 export function buildJiraTicketUrl(
@@ -21,4 +34,4 @@ export function buildJiraTicketUrl(
   return `${host}/browse/${ticket}`;
 }
 
-export default { extractJiraTicket, buildJiraTicketUrl };
+export default { extractJiraTickets, extractJiraTicket, buildJiraTicketUrl };

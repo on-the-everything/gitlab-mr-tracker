@@ -4,7 +4,7 @@ import { AvatarList } from '../AvatarList/AvatarList';
 import { Avatar } from '../Avatar/Avatar';
 import { formatTimeAgo } from '../../utils/timeFormatter';
 import { splitRepositoryPath } from '../../utils/repositoryFormatter';
-import { extractJiraTicket, buildJiraTicketUrl } from '../../utils/jira';
+import { extractJiraTickets, buildJiraTicketUrl } from '../../utils/jira';
 import { useConfig } from '../../hooks/useConfig';
 
 interface MRCardProps {
@@ -26,8 +26,7 @@ export function MRCard({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRea
 
   const repoParts = splitRepositoryPath(mr.repository);
   const { config } = useConfig();
-  const ticket = extractJiraTicket(mr.sourceBranch, mr.title, (mr as any).description);
-  const jiraUrl = ticket ? buildJiraTicketUrl(ticket, config.jiraHost) : null;
+  const tickets = extractJiraTickets(mr.sourceBranch, mr.title, (mr as any).description);
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
@@ -85,14 +84,19 @@ export function MRCard({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRea
         <span>{formatTimeAgo(mr.createdAt)}</span>
         <span className="mx-2">•</span>
         <span>
-          {ticket ? (
-            jiraUrl ? (
-              <a href={jiraUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                {ticket}
-              </a>
-            ) : (
-              <span className="text-gray-700">{ticket}</span>
-            )
+          {tickets && tickets.length > 0 ? (
+            <span className="flex items-center gap-2 flex-wrap">
+              {tickets.map((t) => {
+                const url = buildJiraTicketUrl(t, config.jiraHost);
+                return url ? (
+                  <a key={t} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    {t}
+                  </a>
+                ) : (
+                  <span key={t} className="text-gray-700">{t}</span>
+                );
+              })}
+            </span>
           ) : (
             <span className="text-gray-400">No Jira Ticket</span>
           )}

@@ -4,7 +4,7 @@ import { AvatarList } from '../AvatarList/AvatarList';
 import { Avatar } from '../Avatar/Avatar';
 import { formatTimeAgo } from '../../utils/timeFormatter';
 import { splitRepositoryPath } from '../../utils/repositoryFormatter';
-import { extractJiraTicket, buildJiraTicketUrl } from '../../utils/jira';
+import { extractJiraTickets, buildJiraTicketUrl } from '../../utils/jira';
 import { useConfig } from '../../hooks/useConfig';
 
 interface MRRowProps {
@@ -27,8 +27,7 @@ export function MRRow({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead
 
   const repoParts = splitRepositoryPath(mr.repository);
   const { config } = useConfig();
-  const ticket = extractJiraTicket(mr.sourceBranch, mr.title, (mr as any).description);
-  const jiraUrl = ticket ? buildJiraTicketUrl(ticket, config.jiraHost) : null;
+  const tickets = extractJiraTickets(mr.sourceBranch, mr.title, (mr as any).description);
 
   return (
     <tr className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
@@ -76,19 +75,19 @@ export function MRRow({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead
 
       {/* Jira Column */}
       <td className="px-4 py-3">
-        {ticket ? (
-          jiraUrl ? (
-            <a
-              href={jiraUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
-            >
-              {ticket}
-            </a>
-          ) : (
-            <span className="text-gray-700">{ticket}</span>
-          )
+        {tickets && tickets.length > 0 ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            {tickets.map((t) => {
+              const url = buildJiraTicketUrl(t, config.jiraHost);
+              return url ? (
+                <a key={t} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                  {t}
+                </a>
+              ) : (
+                <span key={t} className="text-gray-700">{t}</span>
+              );
+            })}
+          </div>
         ) : (
           <span className="text-sm text-gray-400">—</span>
         )}
