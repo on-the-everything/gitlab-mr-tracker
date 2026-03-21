@@ -34,6 +34,7 @@ export interface MergeRequest {
   iid: number;
   title: string;
   repository: string;
+  sourceBranch?: string;
   status: MRStatus;
   statusUpdatedAt: string;
   author: Author;
@@ -47,6 +48,7 @@ export interface MergeRequest {
 
 export interface AppConfig {
   gitlabHost: string;
+  jiraHost?: string;
   accessToken: string;
   autoRefreshInterval: number;
   myAccount: string;

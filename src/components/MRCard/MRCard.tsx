@@ -4,6 +4,8 @@ import { AvatarList } from '../AvatarList/AvatarList';
 import { Avatar } from '../Avatar/Avatar';
 import { formatTimeAgo } from '../../utils/timeFormatter';
 import { splitRepositoryPath } from '../../utils/repositoryFormatter';
+import { extractJiraTicket, buildJiraTicketUrl } from '../../utils/jira';
+import { useConfig } from '../../hooks/useConfig';
 
 interface MRCardProps {
   mr: MergeRequest;
@@ -23,6 +25,9 @@ export function MRCard({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRea
   };
 
   const repoParts = splitRepositoryPath(mr.repository);
+  const { config } = useConfig();
+  const ticket = extractJiraTicket(mr.sourceBranch || mr.title);
+  const jiraUrl = ticket ? buildJiraTicketUrl(ticket, config.jiraHost) : null;
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
@@ -35,11 +40,10 @@ export function MRCard({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRea
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleMRClick}
-              className={`hover:underline ${
-                hasNewComments
+              className={`hover:underline ${hasNewComments
                   ? 'text-blue-700 font-bold'
                   : 'text-blue-600 font-medium'
-              } hover:text-blue-800`}
+                } hover:text-blue-800`}
             >
               {mr.title}
             </a>
@@ -79,6 +83,20 @@ export function MRCard({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRea
         <span>#{mr.iid}</span>
         <span className="mx-2">•</span>
         <span>{formatTimeAgo(mr.createdAt)}</span>
+        <span className="mx-2">•</span>
+        <span>
+          {ticket ? (
+            jiraUrl ? (
+              <a href={jiraUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                {ticket}
+              </a>
+            ) : (
+              <span className="text-gray-700">{ticket}</span>
+            )
+          ) : (
+            <span className="text-gray-400">No Jira Ticket</span>
+          )}
+        </span>
       </div>
 
       {/* Status */}

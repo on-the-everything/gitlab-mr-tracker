@@ -42,6 +42,14 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
       newErrors.accessToken = 'Access token is required';
     }
 
+    if (formData.jiraHost && formData.jiraHost.trim()) {
+      try {
+        new URL(formData.jiraHost);
+      } catch {
+        newErrors.jiraHost = 'Invalid URL format';
+      }
+    }
+
     if (formData.autoRefreshInterval <= 0) {
       newErrors.autoRefreshInterval = 'Auto-refresh interval must be greater than 0';
     }
@@ -117,6 +125,7 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
             fetchTimeUnit: imported.fetchTimeUnit || 'weeks',
             fetchTimeValue: imported.fetchTimeValue || 2,
             fetchClosedMRs: imported.fetchClosedMRs !== undefined ? imported.fetchClosedMRs : false,
+            jiraHost: imported.jiraHost || '',
           });
 
           alert('Configuration imported successfully! Click Save to apply.');
@@ -208,6 +217,29 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
               )}
               <p className="mt-1 text-xs text-gray-500">
                 Create a token at: Settings → Access Tokens
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="jiraHost" className="block text-sm font-medium text-gray-700 mb-1">
+                Jira Host (optional)
+              </label>
+              <input
+                type="text"
+                id="jiraHost"
+                value={(formData as any).jiraHost || ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, ...({ jiraHost: e.target.value } as any) })
+                }
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.jiraHost ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                placeholder="https://your-company.atlassian.net"
+              />
+              {errors.jiraHost && (
+                <p className="mt-1 text-sm text-red-600">{errors.jiraHost}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                Optional — used to build links to Jira tickets discovered in branch names.
               </p>
             </div>
 

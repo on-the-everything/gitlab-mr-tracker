@@ -4,6 +4,8 @@ import { AvatarList } from '../AvatarList/AvatarList';
 import { Avatar } from '../Avatar/Avatar';
 import { formatTimeAgo } from '../../utils/timeFormatter';
 import { splitRepositoryPath } from '../../utils/repositoryFormatter';
+import { extractJiraTicket, buildJiraTicketUrl } from '../../utils/jira';
+import { useConfig } from '../../hooks/useConfig';
 
 interface MRRowProps {
   mr: MergeRequest;
@@ -24,6 +26,9 @@ export function MRRow({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead
   };
 
   const repoParts = splitRepositoryPath(mr.repository);
+  const { config } = useConfig();
+  const ticket = extractJiraTicket(mr.sourceBranch || mr.title);
+  const jiraUrl = ticket ? buildJiraTicketUrl(ticket, config.jiraHost) : null;
 
   return (
     <tr className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
@@ -65,6 +70,25 @@ export function MRRow({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead
             <span>#{mr.iid}</span>
             <span>•</span>
             <span>{formatTimeAgo(mr.createdAt)}</span>
+            <span>•</span>
+            <span>
+              {ticket ? (
+                jiraUrl ? (
+                  <a
+                    href={jiraUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    {ticket}
+                  </a>
+                ) : (
+                  <span className="text-gray-700">{ticket}</span>
+                )
+              ) : (
+                <span className="text-gray-400">No Jira Ticket</span>
+              )}
+            </span>
           </div>
         </div>
       </td>
