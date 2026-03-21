@@ -8,6 +8,7 @@ import { ConfigModal } from './components/ConfigModal/ConfigModal';
 import { MRTable } from './components/MRTable/MRTable';
 import { FilterControls } from './components/FilterControls/FilterControls';
 import MergedUATPage from './components/MergedUATPage/MergedUATPage';
+import CompareBranchesPage from './components/CompareBranchesPage/CompareBranchesPage';
 import { formatTimeAgo } from './utils/timeFormatter';
 import { MRStatus } from './types';
 import { storage } from './services/storage';
@@ -224,6 +225,13 @@ function App() {
               >
                 🎯 Merged → UAT
               </Link>
+              <Link
+                to="/compare-develop-master"
+                className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors"
+                title="Compare develop → master"
+              >
+                🔀 Compare develop → master
+              </Link>
               <button
                 onClick={() => setIsConfigOpen(true)}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
@@ -332,6 +340,19 @@ function App() {
                 onBack={() => navigate('/')}
                 labelFilters={labelFilters}
                 onLabelClick={(label) => setLabelFilters((prev) => prev.includes(label) ? prev : [...prev, label])}
+                selectedRepository={selectedRepository}
+              />
+            )}
+          />
+          <Route
+            path="/compare-develop-master"
+            element={(
+              <CompareBranchesPage
+                onMarkAsRead={markMRAsRead}
+                onMarkAsUnread={markMRAsUnread}
+                hasNewComments={(mr) => hasNewComments(mr)}
+                isRead={(id) => isRead(id)}
+                onBack={() => navigate('/')}
                 selectedRepository={selectedRepository}
               />
             )}

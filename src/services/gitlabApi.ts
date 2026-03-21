@@ -314,3 +314,74 @@ export async function fetchMRsByAuthor(
 }
 
 export { GitLabAPIError };
+
+export async function fetchMergeRequestsByBranches(
+  config: AppConfig,
+  sourceBranch: string,
+  targetBranch: string,
+): Promise<MergeRequest[]> {
+  const baseUrl = `${config.gitlabHost}/api/v4/merge_requests`;
+
+  const url = `${baseUrl}?state=opened&source_branch=${encodeURIComponent(
+    sourceBranch,
+  )}&target_branch=${encodeURIComponent(targetBranch)}&per_page=100`;
+
+  try {
+    const response = await fetchGitLabAPI(url, config.accessToken);
+    const mrList: GitLabMR[] = await response.json();
+
+    // For each MR we need full normalized MergeRequest shape
+    const mrDetails = await Promise.allSettled(
+      mrList.map(async (mr) => {
+        // Resolve project path
+        let projectPath: string;
+        try {
+          const projectUrl = `${config.gitlabHost}/api/v4/projects/${mr.project_id}`;
+          const projectResponse = await fetchGitLabAPI(
+            projectUrl,
+            config.accessToken,
+          );
+          const project = await projectResponse.json();
+          projectPath = project.path_with_namespace;
+        } catch {
+          if (mr.web_url) {
+            const urlMatch = mr.web_url.match(
+              /https?:\/\/[^/]+\/(.+?)\/-\/merge_requests/,
+            );
+            if (urlMatch) {
+              projectPath = urlMatch[1];
+            } else {
+              throw new Error(
+                `Could not get project path for project ${mr.project_id}`,
+              );
+            }
+          } else {
+            throw new Error(
+              `Could not get project path for project ${mr.project_id}`,
+            );
+          }
+        }
+
+        const parsedUrl = {
+          host: config.gitlabHost,
+          projectPath,
+          iid: mr.iid,
+        };
+
+        return fetchMergeRequest(config, parsedUrl);
+      }),
+    );
+
+    const finalMRs = mrDetails
+      .filter(
+        (r): r is PromiseFulfilledResult<MergeRequest> =>
+          r.status === "fulfilled",
+      )
+      .map((r) => r.value);
+
+    return finalMRs;
+  } catch (error) {
+    console.error("Failed to fetch merge requests by branches:", error);
+    throw error;
+  }
+}
