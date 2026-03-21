@@ -9,6 +9,7 @@ import { MRTable } from './components/MRTable/MRTable';
 import { FilterControls } from './components/FilterControls/FilterControls';
 import MergedUATPage from './pages/MergedUATPage';
 import CompareBranchesPage from './pages/CompareBranchesPage';
+import FeaturePage from './pages/Feature';
 
 import { MRStatus } from './types';
 import { storage } from './services/storage';
@@ -305,6 +306,12 @@ function App() {
                 onBack={() => navigate('/')}
                 selectedRepository={selectedRepository}
               />
+            )}
+          />
+          <Route
+            path="/feature"
+            element={(
+              <FeaturePage />
             )}
           />
         </Routes>

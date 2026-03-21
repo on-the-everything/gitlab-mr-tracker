@@ -42,6 +42,13 @@ export function NavBar({ addMR, loading, error, onErrorClear, lastUpdated, onRef
                     >
                         🔀 Compare develop → master
                     </Link>
+                    <Link
+                        to="/feature"
+                        className="px-4 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition-colors"
+                        title="Feature page"
+                    >
+                        ✨ Feature
+                    </Link>
                     <button
                         onClick={onOpenConfig}
                         className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
