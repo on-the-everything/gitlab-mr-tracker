@@ -1,6 +1,8 @@
 import { MRStatus, MergeRequest } from '../../types';
 import { MRTable } from '../MRTable/MRTable';
 import { useConfig } from '../../hooks/useConfig';
+import { useState } from 'react';
+import ExportDialog from '../ExportDialog/ExportDialog';
 
 interface MergedUATPageProps {
     mrList: MergeRequest[];
@@ -20,6 +22,7 @@ const isWaitingUATLabel = (label: string) => {
 
 export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilters, onLabelClick, selectedRepository }: MergedUATPageProps) {
     const { config } = useConfig();
+    const [exportVisible, setExportVisible] = useState(false);
     // Default: show all merged MRs. If `labelFilters` are provided, apply them.
     let mergedWaiting = mrList.filter((mr) => mr.status === MRStatus.MERGED);
 
@@ -55,6 +58,13 @@ export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComm
                             ← Back
                         </button>
 
+                        <button
+                            onClick={() => setExportVisible(true)}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                        >
+                            Export
+                        </button>
+
                         {/* Compare develop -> master on GitLab for the selected repository */}
                         {(() => {
                             // Only enable compare when a repository is explicitly selected
@@ -75,6 +85,7 @@ export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComm
                                 </button>
                             );
                         })()}
+                        <ExportDialog visible={exportVisible} onClose={() => setExportVisible(false)} mrList={mergedWaiting} />
                     </div>
                 </div>
 
