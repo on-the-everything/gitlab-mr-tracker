@@ -70,27 +70,28 @@ export function MRRow({ mr, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead
             <span>#{mr.iid}</span>
             <span>•</span>
             <span>{formatTimeAgo(mr.createdAt)}</span>
-            <span>•</span>
-            <span>
-              {ticket ? (
-                jiraUrl ? (
-                  <a
-                    href={jiraUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    {ticket}
-                  </a>
-                ) : (
-                  <span className="text-gray-700">{ticket}</span>
-                )
-              ) : (
-                <span className="text-gray-400">No Jira Ticket</span>
-              )}
-            </span>
           </div>
         </div>
+      </td>
+
+      {/* Jira Column */}
+      <td className="px-4 py-3">
+        {ticket ? (
+          jiraUrl ? (
+            <a
+              href={jiraUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              {ticket}
+            </a>
+          ) : (
+            <span className="text-gray-700">{ticket}</span>
+          )
+        ) : (
+          <span className="text-sm text-gray-400">—</span>
+        )}
       </td>
 
       {/* Status Column */}

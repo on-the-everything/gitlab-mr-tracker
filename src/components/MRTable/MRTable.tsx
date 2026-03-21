@@ -30,6 +30,9 @@ export function MRTable({ title, mrList, onMarkAsRead, onMarkAsUnread, hasNewCom
                   Merge Request
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                  Jira
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
                   Status
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
