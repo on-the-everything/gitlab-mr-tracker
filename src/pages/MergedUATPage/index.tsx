@@ -1,8 +1,8 @@
 import { MRStatus, MergeRequest } from '../../types';
-import { MRTable } from '../MRTable/MRTable';
+import { MRTable } from '../../components/MRTable/MRTable';
 import { useConfig } from '../../hooks/useConfig';
 import { useState } from 'react';
-import ExportDialog from '../ExportDialog/ExportDialog';
+import ExportDialog from '../../components/ExportDialog/ExportDialog';
 
 interface MergedUATPageProps {
     mrList: MergeRequest[];
@@ -63,7 +63,6 @@ export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComm
 
                         {/* Compare develop -> master on GitLab for the selected repository */}
                         {(() => {
-                            // Only enable compare when a repository is explicitly selected
                             const repoPathRaw = (selectedRepository && selectedRepository !== 'select') ? selectedRepository : '';
                             const repoPath = repoPathRaw.replace(/^\/+|\/+$/g, '');
                             const encodedRepoPath = repoPath

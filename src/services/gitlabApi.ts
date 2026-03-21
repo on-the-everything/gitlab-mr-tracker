@@ -322,7 +322,7 @@ export async function fetchMergeRequestsByBranches(
 ): Promise<MergeRequest[]> {
   const baseUrl = `${config.gitlabHost}/api/v4/merge_requests`;
 
-  const url = `${baseUrl}?state=opened&source_branch=${encodeURIComponent(
+  const url = `${baseUrl}?state=opened&scope=all&source_branch=${encodeURIComponent(
     sourceBranch,
   )}&target_branch=${encodeURIComponent(targetBranch)}&per_page=100`;
 

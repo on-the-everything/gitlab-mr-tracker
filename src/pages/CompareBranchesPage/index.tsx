@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MRTable } from '../MRTable/MRTable';
+import { MRTable } from '../../components/MRTable/MRTable';
 import { useConfig } from '../../hooks/useConfig';
 import { fetchMergeRequestsByBranches } from '../../services/gitlabApi';
 import { MergeRequest } from '../../types';
