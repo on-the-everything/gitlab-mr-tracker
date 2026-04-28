@@ -10,6 +10,7 @@ import { FilterControls } from './components/FilterControls/FilterControls';
 import MergedUATPage from './pages/MergedUATPage';
 import CompareBranchesPage from './pages/CompareBranchesPage';
 import FeaturePage from './pages/Feature';
+import UtilsPage from './pages/UtilsPage';
 
 import { MRStatus } from './types';
 import { storage } from './services/storage';
@@ -312,6 +313,12 @@ function App() {
             path="/feature"
             element={(
               <FeaturePage />
+            )}
+          />
+          <Route
+            path="/utils"
+            element={(
+              <UtilsPage />
             )}
           />
         </Routes>

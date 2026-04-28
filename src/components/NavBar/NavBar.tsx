@@ -49,6 +49,13 @@ export function NavBar({ addMR, loading, error, onErrorClear, lastUpdated, onRef
                     >
                         ✨ Feature
                     </Link>
+                    <Link
+                        to="/utils"
+                        className="px-4 py-2 bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 transition-colors"
+                        title="Utils - format converter"
+                    >
+                        🔧 Utils
+                    </Link>
                     <button
                         onClick={onOpenConfig}
                         className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-colors"
