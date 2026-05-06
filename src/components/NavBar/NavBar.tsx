@@ -1,18 +1,14 @@
 import { Link } from 'react-router-dom';
-import { AddMRInput } from '../AddMRInput/AddMRInput';
 import { formatTimeAgo } from '../../utils/timeFormatter';
 
 interface NavBarProps {
-    addMR: (url: string) => Promise<void>;
     loading: boolean;
-    error: string | null;
-    onErrorClear: () => void;
     lastUpdated: string | null;
     onRefresh: () => void;
     onOpenConfig: () => void;
 }
 
-export function NavBar({ addMR, loading, error, onErrorClear, lastUpdated, onRefresh, onOpenConfig }: NavBarProps) {
+export function NavBar({ loading, lastUpdated, onRefresh, onOpenConfig }: NavBarProps) {
     return (
         <div className="mb-8">
             <div className="flex justify-between items-center mb-4">
@@ -64,18 +60,6 @@ export function NavBar({ addMR, loading, error, onErrorClear, lastUpdated, onRef
                         ⚙️
                     </button>
                 </div>
-            </div>
-
-            <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Add Custom MR
-                </label>
-                <AddMRInput
-                    onAdd={addMR}
-                    loading={loading}
-                    error={error}
-                    onErrorClear={onErrorClear}
-                />
             </div>
 
             {lastUpdated && (

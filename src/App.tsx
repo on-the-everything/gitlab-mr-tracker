@@ -21,9 +21,7 @@ function App() {
     mrList,
     lastUpdated,
     loading,
-    error,
     categorizeMRs,
-    addMR,
     refreshAll,
     subscribeToAccounts,
     updateMRList,
@@ -31,7 +29,6 @@ function App() {
     markMRAsUnread,
     hasNewComments,
     isRead,
-    setError,
   } = useMRData(config);
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -206,10 +203,7 @@ function App() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <NavBar
-          addMR={addMR}
           loading={loading}
-          error={error}
-          onErrorClear={() => setError(null)}
           lastUpdated={lastUpdated}
           onRefresh={handleRefreshClick}
           onOpenConfig={() => setIsConfigOpen(true)}
@@ -329,7 +323,7 @@ function App() {
             <p className="text-lg">No merge requests to display.</p>
             <p className="text-sm mt-2">
               {mrList.length === 0
-                ? 'Configure your accounts in settings or add a custom MR to get started.'
+                ? 'Configure your accounts in settings to get started.'
                 : 'All merge requests are filtered out.'}
             </p>
           </div>
