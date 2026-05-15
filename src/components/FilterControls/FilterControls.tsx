@@ -44,6 +44,85 @@ export function FilterControls({
 }: FilterControlsProps) {
   // local input state for adding labels
   const [inputValue, setInputValue] = React.useState('');
+  const [repositorySearch, setRepositorySearch] = React.useState(selectedRepository ?? '');
+  const [isRepositoryMenuOpen, setIsRepositoryMenuOpen] = React.useState(false);
+  const repositorySearchRef = React.useRef<HTMLDivElement>(null);
+  const previousSelectedRepositoryRef = React.useRef(selectedRepository ?? '');
+
+  React.useEffect(() => {
+    const nextSelectedRepository = selectedRepository ?? '';
+    const previousSelectedRepository = previousSelectedRepositoryRef.current;
+    previousSelectedRepositoryRef.current = nextSelectedRepository;
+
+    setRepositorySearch((currentSearch) => {
+      if (nextSelectedRepository || currentSearch === previousSelectedRepository) {
+        return nextSelectedRepository;
+      }
+
+      return currentSearch;
+    });
+  }, [selectedRepository]);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        repositorySearchRef.current &&
+        !repositorySearchRef.current.contains(event.target as Node)
+      ) {
+        setIsRepositoryMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredRepositories = React.useMemo(() => {
+    if (!repositoryList) return [];
+
+    const search = repositorySearch.trim().toLowerCase();
+    if (!search) return repositoryList;
+
+    return repositoryList.filter((repository) =>
+      repository.toLowerCase().includes(search),
+    );
+  }, [repositoryList, repositorySearch]);
+
+  const handleRepositorySearchChange = (value: string) => {
+    setRepositorySearch(value);
+    setIsRepositoryMenuOpen(true);
+
+    if (!value) {
+      onRepositoryChange?.('');
+      return;
+    }
+
+    const exactMatch = repositoryList?.find(
+      (repository) => repository.toLowerCase() === value.trim().toLowerCase(),
+    );
+    if (exactMatch) {
+      onRepositoryChange?.(exactMatch);
+    } else if (selectedRepository) {
+      onRepositoryChange?.('');
+    }
+  };
+
+  const handleRepositorySelect = (repository: string) => {
+    setRepositorySearch(repository);
+    setIsRepositoryMenuOpen(false);
+    onRepositoryChange?.(repository);
+  };
+
+  const handleRepositoryKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && filteredRepositories.length > 0) {
+      e.preventDefault();
+      handleRepositorySelect(filteredRepositories[0]);
+    }
+
+    if (e.key === 'Escape') {
+      setIsRepositoryMenuOpen(false);
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -127,16 +206,61 @@ export function FilterControls({
         {repositoryList && repositoryList.length > 0 && (
           <div className="flex items-center gap-2 w-full mt-2">
             <label className="text-sm font-medium text-gray-700">Repository:</label>
-            <select
-              value={selectedRepository ?? ''}
-              onChange={(e) => onRepositoryChange && onRepositoryChange(e.target.value)}
-              className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All repositories</option>
-              {repositoryList.map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
+            <div ref={repositorySearchRef} className="relative w-full max-w-md">
+              <input
+                type="search"
+                value={repositorySearch}
+                placeholder="All repositories"
+                onChange={(e) => handleRepositorySearchChange(e.target.value)}
+                onFocus={() => setIsRepositoryMenuOpen(true)}
+                onKeyDown={handleRepositoryKeyDown}
+                className="w-full px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-label="Search repository"
+                aria-expanded={isRepositoryMenuOpen}
+                aria-controls="repository-filter-options"
+                role="combobox"
+              />
+              {isRepositoryMenuOpen && (
+                <div
+                  id="repository-filter-options"
+                  className="absolute z-20 mt-1 w-full max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+                >
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setRepositorySearch('');
+                      setIsRepositoryMenuOpen(false);
+                      onRepositoryChange?.('');
+                    }}
+                    className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${
+                      selectedRepository ? 'text-gray-700' : 'bg-blue-50 text-blue-700'
+                    }`}
+                  >
+                    All repositories
+                  </button>
+                  {filteredRepositories.length > 0 ? (
+                    filteredRepositories.map((repository) => (
+                      <button
+                        key={repository}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleRepositorySelect(repository)}
+                        className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${
+                          selectedRepository === repository
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'text-gray-700'
+                        }`}
+                      >
+                        {repository}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-sm text-gray-500">No repositories found</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
         <div className="flex items-center gap-2 ml-2">
@@ -161,4 +285,3 @@ export function FilterControls({
     </div>
   );
 }
-
