@@ -47,6 +47,11 @@ export interface MergeRequest {
   labels: string[]; // GitLab labels/tags
 }
 
+export interface RepositoryGroup {
+  name: string;
+  repositories: string[];
+}
+
 export interface AppConfig {
   gitlabHost: string;
   jiraHost?: string;
@@ -57,6 +62,7 @@ export interface AppConfig {
   fetchTimeUnit: "days" | "weeks";
   fetchTimeValue: number;
   fetchClosedMRs: boolean;
+  repositoryGroups: RepositoryGroup[];
 }
 
 export interface ParsedMRUrl {

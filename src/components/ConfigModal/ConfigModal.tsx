@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AppConfig } from '../../types';
+import { AppConfig, type RepositoryGroup } from '../../types';
 
 interface ConfigModalProps {
   isOpen: boolean;
@@ -8,18 +8,91 @@ interface ConfigModalProps {
   onSave: (config: AppConfig) => void;
 }
 
+function normalizeRepositoryGroups(repositoryGroups: unknown): RepositoryGroup[] {
+  if (!Array.isArray(repositoryGroups)) {
+    return [];
+  }
+
+  return repositoryGroups.map((group) => {
+    const groupRecord =
+      group && typeof group === 'object'
+        ? (group as Partial<RepositoryGroup>)
+        : {};
+    const repositories = Array.isArray(groupRecord.repositories)
+      ? groupRecord.repositories
+        .filter((repository): repository is string => typeof repository === 'string')
+        .map((repository) => repository.trim())
+        .filter(Boolean)
+      : [];
+
+    return {
+      name: typeof groupRecord.name === 'string' ? groupRecord.name.trim() : '',
+      repositories,
+    };
+  });
+}
+
+function normalizeConfig(config: Partial<AppConfig>): AppConfig {
+  return {
+    gitlabHost: config.gitlabHost || '',
+    accessToken: config.accessToken || '',
+    autoRefreshInterval: config.autoRefreshInterval || 60,
+    myAccount: config.myAccount || '',
+    teamAccounts: Array.isArray(config.teamAccounts) ? config.teamAccounts : [],
+    fetchTimeUnit:
+      config.fetchTimeUnit === 'days' || config.fetchTimeUnit === 'weeks'
+        ? config.fetchTimeUnit
+        : 'weeks',
+    fetchTimeValue: config.fetchTimeValue || 2,
+    fetchClosedMRs: config.fetchClosedMRs !== undefined ? config.fetchClosedMRs : false,
+    jiraHost: config.jiraHost || '',
+    repositoryGroups: normalizeRepositoryGroups(config.repositoryGroups),
+  };
+}
+
+function parseRepositoryInput(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,]+/)
+        .map((repository) => repository.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function formatRepositoryInput(repositories: string[]): string {
+  return repositories.join('\n');
+}
+
+function sanitizeConfig(config: AppConfig): AppConfig {
+  return {
+    ...config,
+    gitlabHost: config.gitlabHost.trim(),
+    jiraHost: config.jiraHost?.trim() || '',
+    myAccount: config.myAccount.trim(),
+    teamAccounts: config.teamAccounts.map((account) => account.trim()).filter(Boolean),
+    repositoryGroups: normalizeRepositoryGroups(config.repositoryGroups).filter(
+      (group) => group.name && group.repositories.length > 0,
+    ),
+  };
+}
+
 export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProps) {
   const [formData, setFormData] = useState<AppConfig>(config);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<'form' | 'json'>('form');
   const [jsonText, setJsonText] = useState<string>('');
+  const [repositoryGroupTexts, setRepositoryGroupTexts] = useState<string[]>([]);
 
   useEffect(() => {
     if (isOpen) {
-      setFormData(config);
+      const normalizedConfig = normalizeConfig(config);
+      setFormData(normalizedConfig);
       setErrors({});
-      setJsonText(JSON.stringify(config, null, 2));
+      setJsonText(JSON.stringify(normalizedConfig, null, 2));
       setViewMode('form');
+      setRepositoryGroupTexts(normalizedConfig.repositoryGroups.map((g) => formatRepositoryInput(g.repositories)));
     }
   }, [isOpen, config]);
 
@@ -63,6 +136,26 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
       }
     }
 
+    const repositoryGroupNames = new Set<string>();
+    formData.repositoryGroups.forEach((group, index) => {
+      const groupName = group.name.trim();
+      const repositories = group.repositories.map((repository) => repository.trim()).filter(Boolean);
+
+      if (!groupName) {
+        newErrors[`repositoryGroupName-${index}`] = 'Group name is required';
+      } else {
+        const normalizedGroupName = groupName.toLowerCase();
+        if (repositoryGroupNames.has(normalizedGroupName)) {
+          newErrors[`repositoryGroupName-${index}`] = 'Group name must be unique';
+        }
+        repositoryGroupNames.add(normalizedGroupName);
+      }
+
+      if (repositories.length === 0) {
+        newErrors[`repositoryGroupRepositories-${index}`] = 'Add at least one repository';
+      }
+    });
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -70,10 +163,10 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
   const handleJsonChange = (value: string) => {
     setJsonText(value);
     try {
-      const parsed = JSON.parse(value) as AppConfig;
-      setFormData(parsed);
+      const parsed = JSON.parse(value) as Partial<AppConfig>;
+      setFormData(normalizeConfig(parsed));
       setErrors({});
-    } catch (error) {
+    } catch {
       setErrors({ json: 'Invalid JSON format' });
     }
   };
@@ -107,7 +200,7 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
-          const imported = JSON.parse(event.target?.result as string) as AppConfig;
+          const imported = JSON.parse(event.target?.result as string) as Partial<AppConfig>;
 
           // Validate imported config
           if (!imported.gitlabHost || !imported.accessToken) {
@@ -116,17 +209,7 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
           }
 
           // Update form with imported config
-          setFormData({
-            gitlabHost: imported.gitlabHost || '',
-            accessToken: imported.accessToken || '',
-            autoRefreshInterval: imported.autoRefreshInterval || 60,
-            myAccount: imported.myAccount || '',
-            teamAccounts: imported.teamAccounts || [],
-            fetchTimeUnit: imported.fetchTimeUnit || 'weeks',
-            fetchTimeValue: imported.fetchTimeValue || 2,
-            fetchClosedMRs: imported.fetchClosedMRs !== undefined ? imported.fetchClosedMRs : false,
-            jiraHost: imported.jiraHost || '',
-          });
+          setFormData(normalizeConfig(imported));
 
           alert('Configuration imported successfully! Click Save to apply.');
         } catch (error) {
@@ -227,9 +310,9 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
               <input
                 type="text"
                 id="jiraHost"
-                value={(formData as any).jiraHost || ''}
+                value={formData.jiraHost || ''}
                 onChange={(e) =>
-                  setFormData({ ...formData, ...({ jiraHost: e.target.value } as any) })
+                  setFormData({ ...formData, jiraHost: e.target.value })
                 }
                 className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.jiraHost ? 'border-red-500' : 'border-gray-300'
                   }`}
@@ -421,6 +504,94 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
               </p>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Repository Groups
+              </label>
+              <div className="space-y-3">
+                {formData.repositoryGroups.map((group, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                    <div className="flex gap-2 items-start">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={group.name}
+                          onChange={(e) => {
+                            const nextGroups = [...formData.repositoryGroups];
+                            nextGroups[index] = { ...group, name: e.target.value };
+                            setFormData({ ...formData, repositoryGroups: nextGroups });
+                          }}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[`repositoryGroupName-${index}`] ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                          placeholder="product-sqd"
+                        />
+                        {errors[`repositoryGroupName-${index}`] && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {errors[`repositoryGroupName-${index}`]}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextGroups = formData.repositoryGroups.filter((_, i) => i !== index);
+                          setFormData({ ...formData, repositoryGroups: nextGroups });
+                          setRepositoryGroupTexts(repositoryGroupTexts.filter((_, i) => i !== index));
+                        }}
+                        className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div>
+                      <textarea
+                        value={repositoryGroupTexts[index] ?? formatRepositoryInput(group.repositories)}
+                        onChange={(e) => {
+                          const rawValue = e.target.value;
+                          const nextTexts = [...repositoryGroupTexts];
+                          nextTexts[index] = rawValue;
+                          setRepositoryGroupTexts(nextTexts);
+                          const nextGroups = [...formData.repositoryGroups];
+                          nextGroups[index] = {
+                            ...group,
+                            repositories: parseRepositoryInput(rawValue),
+                          };
+                          setFormData({ ...formData, repositoryGroups: nextGroups });
+                        }}
+                        rows={3}
+                        className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[`repositoryGroupRepositories-${index}`] ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                        placeholder={'product-sqd-android\nproduct-sqd-ios\nproduct-sqd-web'}
+                      />
+                      {errors[`repositoryGroupRepositories-${index}`] && (
+                        <p className="mt-1 text-sm text-red-600">
+                          {errors[`repositoryGroupRepositories-${index}`]}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      repositoryGroups: [
+                        ...formData.repositoryGroups,
+                        { name: '', repositories: [] },
+                      ],
+                    }); setRepositoryGroupTexts([...repositoryGroupTexts, '']);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                >
+                  + Add Repository Group
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Use GitLab project names such as product-sqd-android. Separate repositories with commas or new lines.
+              </p>
+            </div>
+
           </div>
           }
 
@@ -439,6 +610,13 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
               />
               {errors.json && (
                 <p className="mt-1 text-sm text-red-600">{errors.json}</p>
+              )}
+              {!errors.json && Object.entries(errors).length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {Object.values(errors).map((error, index) => (
+                    <p key={`${error}-${index}`} className="text-sm text-red-600">{error}</p>
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -475,8 +653,8 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
               type="button"
               onClick={() => {
                 if (viewMode === 'json' && errors.json) return;
-                if (viewMode === 'form' && !validate()) return;
-                onSave(formData);
+                if (!validate()) return;
+                onSave(sanitizeConfig(formData));
                 onClose();
               }}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -489,4 +667,3 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
     </div >
   );
 }
-

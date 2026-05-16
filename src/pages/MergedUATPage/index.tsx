@@ -1,8 +1,9 @@
-import { MRStatus, MergeRequest } from '../../types';
+import { MRStatus, MergeRequest, type RepositoryGroup } from '../../types';
 import { MRTable } from '../../components/MRTable/MRTable';
 import { useConfig } from '../../hooks/useConfig';
 import { useState } from 'react';
 import ExportDialog from '../../components/ExportDialog/ExportDialog';
+import { filterMRsByRepositoryGroups } from '../../utils/repositoryGroups';
 
 interface MergedUATPageProps {
     mrList: MergeRequest[];
@@ -14,9 +15,11 @@ interface MergedUATPageProps {
     labelFilters?: string[];
     onLabelClick?: (label: string) => void;
     selectedRepository?: string;
+    repositoryGroups?: RepositoryGroup[];
+    selectedRepositoryGroups?: string[];
 }
 
-export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilters, onLabelClick, selectedRepository }: MergedUATPageProps) {
+export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, labelFilters, onLabelClick, selectedRepository, repositoryGroups, selectedRepositoryGroups }: MergedUATPageProps) {
     const { config } = useConfig();
     const [exportVisible, setExportVisible] = useState(false);
     // Default: show all merged MRs. If `labelFilters` are provided, apply them.
@@ -26,6 +29,11 @@ export function MergedUATPage({ mrList, onMarkAsRead, onMarkAsUnread, hasNewComm
     if (selectedRepository) {
         mergedWaiting = mergedWaiting.filter((mr) => mr.repository === selectedRepository);
     }
+    mergedWaiting = filterMRsByRepositoryGroups(
+        mergedWaiting,
+        repositoryGroups ?? [],
+        selectedRepositoryGroups ?? [],
+    );
 
     // If label filters are provided, further filter the list using local data (OR semantics)
     if (labelFilters && labelFilters.length > 0) {

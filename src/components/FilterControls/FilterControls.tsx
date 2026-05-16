@@ -1,4 +1,4 @@
-import { MRStatus } from '../../types';
+import { MRStatus, type RepositoryGroup } from '../../types';
 import React from 'react';
 
 interface FilterControlsProps {
@@ -8,6 +8,9 @@ interface FilterControlsProps {
   repositoryList?: string[];
   selectedRepository?: string;
   onRepositoryChange?: (repo: string) => void;
+  repositoryGroups?: RepositoryGroup[];
+  selectedRepositoryGroups?: string[];
+  onRepositoryGroupChange?: (groupName: string, selected: boolean) => void;
   labelFilters?: string[];
   onAddLabel?: (value: string) => void;
   onRemoveLabel?: (value: string) => void;
@@ -33,6 +36,9 @@ export function FilterControls({
   repositoryList,
   selectedRepository,
   onRepositoryChange,
+  repositoryGroups,
+  selectedRepositoryGroups,
+  onRepositoryGroupChange,
   labelFilters,
   onAddLabel,
   onRemoveLabel,
@@ -87,6 +93,14 @@ export function FilterControls({
       repository.toLowerCase().includes(search),
     );
   }, [repositoryList, repositorySearch]);
+
+  const visibleRepositoryGroups = React.useMemo(() => {
+    return (repositoryGroups ?? []).filter(
+      (group) =>
+        group.name.trim() &&
+        group.repositories.some((repository) => repository.trim()),
+    );
+  }, [repositoryGroups]);
 
   const handleRepositorySearchChange = (value: string) => {
     setRepositorySearch(value);
@@ -261,6 +275,27 @@ export function FilterControls({
                 </div>
               )}
             </div>
+          </div>
+        )}
+        {visibleRepositoryGroups.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap w-full mt-2">
+            <span className="text-sm font-medium text-gray-700">Repository groups:</span>
+            {visibleRepositoryGroups.map((group, index) => (
+              <label
+                key={`${group.name}-${index}`}
+                className="flex items-center gap-2 px-3 py-1 rounded cursor-pointer hover:bg-gray-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedRepositoryGroups?.includes(group.name) ?? false}
+                  onChange={(e) =>
+                    onRepositoryGroupChange?.(group.name, e.target.checked)
+                  }
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm">{group.name}</span>
+              </label>
+            ))}
           </div>
         )}
         <div className="flex items-center gap-2 ml-2">

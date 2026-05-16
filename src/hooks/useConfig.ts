@@ -12,12 +12,28 @@ const DEFAULT_CONFIG: AppConfig = {
   fetchTimeUnit: "weeks",
   fetchTimeValue: 2,
   fetchClosedMRs: false,
+  repositoryGroups: [],
 };
+
+function migrateConfig(saved: Partial<AppConfig>): AppConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    ...saved,
+    teamAccounts: saved.teamAccounts || [],
+    fetchTimeUnit: saved.fetchTimeUnit || "weeks",
+    fetchTimeValue: saved.fetchTimeValue || 2,
+    fetchClosedMRs:
+      saved.fetchClosedMRs !== undefined ? saved.fetchClosedMRs : false,
+    repositoryGroups: Array.isArray(saved.repositoryGroups)
+      ? saved.repositoryGroups
+      : [],
+  };
+}
 
 export function useConfig() {
   const [config, setConfig] = useState<AppConfig>(() => {
     const saved = storage.getConfig();
-    return saved || DEFAULT_CONFIG;
+    return saved ? migrateConfig(saved) : DEFAULT_CONFIG;
   });
 
   useEffect(() => {
@@ -27,21 +43,15 @@ export function useConfig() {
       const needsMigration =
         !saved.fetchTimeUnit ||
         !saved.fetchTimeValue ||
-        saved.fetchClosedMRs === undefined;
+        saved.fetchClosedMRs === undefined ||
+        saved.repositoryGroups === undefined;
 
       if (needsMigration) {
-        const migrated: AppConfig = {
-          ...DEFAULT_CONFIG,
-          ...saved,
-          fetchTimeUnit: saved.fetchTimeUnit || "weeks",
-          fetchTimeValue: saved.fetchTimeValue || 2,
-          fetchClosedMRs:
-            saved.fetchClosedMRs !== undefined ? saved.fetchClosedMRs : false,
-        };
+        const migrated = migrateConfig(saved);
         setConfig(migrated);
         storage.saveConfig(migrated);
       } else {
-        setConfig(saved);
+        setConfig(migrateConfig(saved));
       }
     }
   }, []);

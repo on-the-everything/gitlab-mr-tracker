@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { MRTable } from '../../components/MRTable/MRTable';
 import { useConfig } from '../../hooks/useConfig';
 import { fetchMergeRequestsByBranches, fetchRepositoryCompare } from '../../services/gitlabApi';
-import { MergeRequest } from '../../types';
+import { MergeRequest, type RepositoryGroup } from '../../types';
+import { filterMRsByRepositoryGroups } from '../../utils/repositoryGroups';
 
 interface Props {
     onMarkAsRead: (id: string) => void;
@@ -11,9 +12,11 @@ interface Props {
     isRead: (id: string) => boolean;
     onBack?: () => void;
     selectedRepository?: string;
+    repositoryGroups?: RepositoryGroup[];
+    selectedRepositoryGroups?: string[];
 }
 
-export function CompareBranchesPage({ onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, selectedRepository }: Props) {
+export function CompareBranchesPage({ onMarkAsRead, onMarkAsUnread, hasNewComments, isRead, onBack, selectedRepository, repositoryGroups, selectedRepositoryGroups }: Props) {
     const { config } = useConfig();
     const [allMRs, setAllMRs] = useState<MergeRequest[]>([]);
     const [list, setList] = useState<MergeRequest[]>([]);
@@ -33,10 +36,6 @@ export function CompareBranchesPage({ onMarkAsRead, onMarkAsUnread, hasNewCommen
                 const mrs = await fetchMergeRequestsByBranches(config, 'develop', 'master');
                 if (!mounted) return;
                 setAllMRs(mrs);
-                const initialFiltered = selectedRepository
-                    ? mrs.filter((mr) => mr.repository === selectedRepository)
-                    : mrs;
-                setList(initialFiltered);
             } catch (err: any) {
                 setError(err?.message || 'Failed to load merge requests');
             } finally {
@@ -57,12 +56,15 @@ export function CompareBranchesPage({ onMarkAsRead, onMarkAsUnread, hasNewCommen
 
     // Recompute visible list when allMRs or repoFilter changes
     useEffect(() => {
-        if (!repoFilter) {
-            setList(allMRs);
-        } else {
-            setList(allMRs.filter((mr) => mr.repository === repoFilter));
-        }
-    }, [allMRs, repoFilter]);
+        const repositoryFiltered = repoFilter
+            ? allMRs.filter((mr) => mr.repository === repoFilter)
+            : allMRs;
+        setList(filterMRsByRepositoryGroups(
+            repositoryFiltered,
+            repositoryGroups ?? [],
+            selectedRepositoryGroups ?? [],
+        ));
+    }, [allMRs, repoFilter, repositoryGroups, selectedRepositoryGroups]);
 
     // Fetch compare diffs for the selected repository (master -> develop)
     useEffect(() => {

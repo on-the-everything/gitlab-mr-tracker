@@ -14,6 +14,7 @@ import UtilsPage from './pages/UtilsPage';
 
 import { MRStatus } from './types';
 import { storage } from './services/storage';
+import { filterMRsByRepositoryGroups } from './utils/repositoryGroups';
 
 function App() {
   const { config, saveConfig } = useConfig();
@@ -54,6 +55,7 @@ function App() {
   // Label filters state (multiple chips)
   const [labelFilters, setLabelFilters] = useState<string[]>([]);
   const [selectedRepository, setSelectedRepository] = useState<string>('');
+  const [selectedRepositoryGroups, setSelectedRepositoryGroups] = useState<string[]>([]);
 
   const repositories = useMemo(() => {
     try {
@@ -82,6 +84,14 @@ function App() {
       });
     }
   }, [config.fetchClosedMRs]);
+
+  useEffect(() => {
+    setSelectedRepositoryGroups((prev) => {
+      const availableGroups = new Set(config.repositoryGroups.map((group) => group.name));
+      const next = prev.filter((groupName) => availableGroups.has(groupName));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [config.repositoryGroups]);
 
   // Auto-subscribe when config changes
   useEffect(() => {
@@ -164,6 +174,14 @@ function App() {
     return mrs.filter((mr) => mr.repository === selectedRepository);
   };
 
+  const applyRepositoryFilters = (mrs: typeof categorized.my) => {
+    return filterMRsByRepositoryGroups(
+      applyRepoFilter(mrs),
+      config.repositoryGroups,
+      selectedRepositoryGroups,
+    );
+  };
+
   if (labelFilters && labelFilters.length > 0) {
     const needles = labelFilters.map((f) => f.trim().toLowerCase()).filter(Boolean);
     const filteredList = mrList.filter((mr) => {
@@ -173,13 +191,13 @@ function App() {
 
     const categorizedFiltered = categorizeMRs(filteredList);
 
-    myMRs = applyRepoFilter(filterByStatus(filterByClosedMRs(categorizedFiltered.my, true)));
-    teamMRs = applyRepoFilter(filterByStatus(filterByClosedMRs(categorizedFiltered.team, true)));
-    otherMRs = applyRepoFilter(filterByStatus(filterByClosedMRs(categorizedFiltered.other, false)));
+    myMRs = applyRepositoryFilters(filterByStatus(filterByClosedMRs(categorizedFiltered.my, true)));
+    teamMRs = applyRepositoryFilters(filterByStatus(filterByClosedMRs(categorizedFiltered.team, true)));
+    otherMRs = applyRepositoryFilters(filterByStatus(filterByClosedMRs(categorizedFiltered.other, false)));
   } else {
-    myMRs = applyRepoFilter(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.my, true), true))));
-    teamMRs = applyRepoFilter(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.team, true), true))));
-    otherMRs = applyRepoFilter(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.other, false), false))));
+    myMRs = applyRepositoryFilters(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.my, true), true))));
+    teamMRs = applyRepositoryFilters(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.team, true), true))));
+    otherMRs = applyRepositoryFilters(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.other, false), false))));
   }
 
   const handleConfigSave = (newConfig: typeof config) => {
@@ -192,6 +210,16 @@ function App() {
 
   const handleStatusFilterChange = (status: MRStatus, visible: boolean) => {
     setStatusFilters((prev) => ({ ...prev, [status]: visible }));
+  };
+
+  const handleRepositoryGroupChange = (groupName: string, selected: boolean) => {
+    setSelectedRepositoryGroups((prev) => {
+      if (selected) {
+        return prev.includes(groupName) ? prev : [...prev, groupName];
+      }
+
+      return prev.filter((name) => name !== groupName);
+    });
   };
 
   const handleRefreshClick = () => {
@@ -217,6 +245,9 @@ function App() {
           repositoryList={repositories}
           selectedRepository={selectedRepository}
           onRepositoryChange={(r) => setSelectedRepository(r)}
+          repositoryGroups={config.repositoryGroups}
+          selectedRepositoryGroups={selectedRepositoryGroups}
+          onRepositoryGroupChange={handleRepositoryGroupChange}
           labelFilters={labelFilters}
           onAddLabel={(v) => setLabelFilters((prev) => prev.includes(v) ? prev : [...prev, v])}
           onRemoveLabel={(v) => setLabelFilters((prev) => prev.filter((p) => p !== v))}
@@ -287,6 +318,8 @@ function App() {
                 labelFilters={labelFilters}
                 onLabelClick={(label) => setLabelFilters((prev) => prev.includes(label) ? prev : [...prev, label])}
                 selectedRepository={selectedRepository}
+                repositoryGroups={config.repositoryGroups}
+                selectedRepositoryGroups={selectedRepositoryGroups}
               />
             )}
           />
@@ -300,6 +333,8 @@ function App() {
                 isRead={(id) => isRead(id)}
                 onBack={() => navigate('/')}
                 selectedRepository={selectedRepository}
+                repositoryGroups={config.repositoryGroups}
+                selectedRepositoryGroups={selectedRepositoryGroups}
               />
             )}
           />
