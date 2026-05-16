@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useConfig } from './hooks/useConfig';
 import { useMRData } from './hooks/useMRData';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
@@ -119,6 +119,9 @@ function App() {
 
   // Auto-refresh handler
   useAutoRefresh(config, mrList, updateMRList, subscribeToAccounts);
+
+  const location = useLocation();
+  const hideFilterControls = location.pathname === '/feature' || location.pathname === '/utils';
 
   // Categorize and filter MRs
   const categorized = categorizeMRs(mrList);
@@ -267,29 +270,31 @@ function App() {
         />
 
         {/* Filter Controls */}
-        <FilterControls
-          statusFilters={statusFilters}
-          onStatusFilterChange={handleStatusFilterChange}
-          fetchClosedMRs={config.fetchClosedMRs}
-          repositoryList={repositories}
-          selectedRepository={selectedRepository}
-          onRepositoryChange={(r) => setSelectedRepository(r)}
-          repositoryGroups={config.repositoryGroups}
-          selectedRepositoryGroups={selectedRepositoryGroups}
-          onRepositoryGroupChange={handleRepositoryGroupChange}
-          labelFilters={labelFilters}
-          onResetFilters={handleResetFilters}
-          onAddLabel={(v) => setLabelFilters((prev) => prev.includes(v) ? prev : [...prev, v])}
-          onRemoveLabel={(v) => setLabelFilters((prev) => prev.filter((p) => p !== v))}
-          onClearLabels={() => setLabelFilters([])}
-          fetchTimeUnit={config.fetchTimeUnit}
-          fetchTimeValue={config.fetchTimeValue}
-          onFetchTimeUnitChange={(u) => saveConfig({ ...config, fetchTimeUnit: u })}
-          onFetchTimeValueChange={(v) => {
-            const val = Number.isNaN(Number(v)) ? config.fetchTimeValue : Number(v);
-            if (val > 0) saveConfig({ ...config, fetchTimeValue: val });
-          }}
-        />
+        {!hideFilterControls && (
+          <FilterControls
+            statusFilters={statusFilters}
+            onStatusFilterChange={handleStatusFilterChange}
+            fetchClosedMRs={config.fetchClosedMRs}
+            repositoryList={repositories}
+            selectedRepository={selectedRepository}
+            onRepositoryChange={(r) => setSelectedRepository(r)}
+            repositoryGroups={config.repositoryGroups}
+            selectedRepositoryGroups={selectedRepositoryGroups}
+            onRepositoryGroupChange={handleRepositoryGroupChange}
+            labelFilters={labelFilters}
+            onResetFilters={handleResetFilters}
+            onAddLabel={(v) => setLabelFilters((prev) => prev.includes(v) ? prev : [...prev, v])}
+            onRemoveLabel={(v) => setLabelFilters((prev) => prev.filter((p) => p !== v))}
+            onClearLabels={() => setLabelFilters([])}
+            fetchTimeUnit={config.fetchTimeUnit}
+            fetchTimeValue={config.fetchTimeValue}
+            onFetchTimeUnitChange={(u) => saveConfig({ ...config, fetchTimeUnit: u })}
+            onFetchTimeValueChange={(v) => {
+              const val = Number.isNaN(Number(v)) ? config.fetchTimeValue : Number(v);
+              if (val > 0) saveConfig({ ...config, fetchTimeValue: val });
+            }}
+          />
+        )}
 
         <Routes>
           <Route
