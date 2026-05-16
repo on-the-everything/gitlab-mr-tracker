@@ -224,6 +224,23 @@ function App() {
     setStatusFilters((prev) => ({ ...prev, [status]: visible }));
   };
 
+  const handleResetFilters = () => {
+    const defaultStatusFilters: Record<MRStatus, boolean> = {
+      [MRStatus.NEW]: true,
+      [MRStatus.COMMENTED]: true,
+      [MRStatus.APPROVED]: true,
+      [MRStatus.REJECTED]: config.fetchClosedMRs,
+      [MRStatus.MERGED]: config.fetchClosedMRs,
+    };
+
+    setStatusFilters(defaultStatusFilters);
+    storage.saveStatusFilters(defaultStatusFilters);
+    setLabelFilters([]);
+    setSelectedRepository('');
+    setSelectedRepositoryGroups([]);
+    saveConfig({ ...config, fetchTimeUnit: 'weeks', fetchTimeValue: 4 });
+  };
+
   const handleRepositoryGroupChange = (groupName: string, selected: boolean) => {
     setSelectedRepositoryGroups((prev) => {
       if (selected) {
@@ -261,6 +278,7 @@ function App() {
           selectedRepositoryGroups={selectedRepositoryGroups}
           onRepositoryGroupChange={handleRepositoryGroupChange}
           labelFilters={labelFilters}
+          onResetFilters={handleResetFilters}
           onAddLabel={(v) => setLabelFilters((prev) => prev.includes(v) ? prev : [...prev, v])}
           onRemoveLabel={(v) => setLabelFilters((prev) => prev.filter((p) => p !== v))}
           onClearLabels={() => setLabelFilters([])}

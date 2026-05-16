@@ -15,6 +15,7 @@ interface FilterControlsProps {
   onAddLabel?: (value: string) => void;
   onRemoveLabel?: (value: string) => void;
   onClearLabels?: () => void;
+  onResetFilters?: () => void;
   fetchTimeUnit: 'days' | 'weeks';
   fetchTimeValue: number;
   onFetchTimeUnitChange: (unit: 'days' | 'weeks') => void;
@@ -43,6 +44,7 @@ export function FilterControls({
   onAddLabel,
   onRemoveLabel,
   onClearLabels,
+  onResetFilters,
   fetchTimeUnit,
   fetchTimeValue,
   onFetchTimeUnitChange,
@@ -148,6 +150,26 @@ export function FilterControls({
       e.preventDefault();
     }
   };
+
+  const handleResetFilters = () => {
+    setInputValue('');
+    setRepositorySearch('');
+    setIsRepositoryMenuOpen(false);
+
+    if (onResetFilters) {
+      onResetFilters();
+      return;
+    }
+
+    onClearLabels?.();
+    onRepositoryChange?.('');
+    selectedRepositoryGroups?.forEach((groupName) =>
+      onRepositoryGroupChange?.(groupName, false),
+    );
+    onFetchTimeUnitChange('weeks');
+    onFetchTimeValueChange(4);
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
       <div className="flex flex-wrap items-center gap-4">
@@ -190,6 +212,12 @@ export function FilterControls({
               onKeyDown={handleKeyDown}
               className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <button
+              onClick={handleResetFilters}
+              className="text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded"
+            >
+              Reset filters
+            </button>
             {labelFilters && labelFilters.length > 0 && (
               <button
                 onClick={() => onClearLabels && onClearLabels()}
@@ -247,9 +275,8 @@ export function FilterControls({
                       setIsRepositoryMenuOpen(false);
                       onRepositoryChange?.('');
                     }}
-                    className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${
-                      selectedRepository ? 'text-gray-700' : 'bg-blue-50 text-blue-700'
-                    }`}
+                    className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${selectedRepository ? 'text-gray-700' : 'bg-blue-50 text-blue-700'
+                      }`}
                   >
                     All repositories
                   </button>
@@ -260,11 +287,10 @@ export function FilterControls({
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => handleRepositorySelect(repository)}
-                        className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${
-                          selectedRepository === repository
+                        className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${selectedRepository === repository
                             ? 'bg-blue-50 text-blue-700'
                             : 'text-gray-700'
-                        }`}
+                          }`}
                       >
                         {repository}
                       </button>
