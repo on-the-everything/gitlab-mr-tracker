@@ -53,9 +53,21 @@ function App() {
   }, [statusFilters]);
 
   // Label filters state (multiple chips)
-  const [labelFilters, setLabelFilters] = useState<string[]>([]);
-  const [selectedRepository, setSelectedRepository] = useState<string>('');
-  const [selectedRepositoryGroups, setSelectedRepositoryGroups] = useState<string[]>([]);
+  const [labelFilters, setLabelFilters] = useState<string[]>(() => storage.getLabelFilters());
+  const [selectedRepository, setSelectedRepository] = useState<string>(() => storage.getSelectedRepository());
+  const [selectedRepositoryGroups, setSelectedRepositoryGroups] = useState<string[]>(() => storage.getSelectedRepositoryGroups());
+
+  useEffect(() => {
+    storage.saveLabelFilters(labelFilters);
+  }, [labelFilters]);
+
+  useEffect(() => {
+    storage.saveSelectedRepository(selectedRepository);
+  }, [selectedRepository]);
+
+  useEffect(() => {
+    storage.saveSelectedRepositoryGroups(selectedRepositoryGroups);
+  }, [selectedRepositoryGroups]);
 
   const repositories = useMemo(() => {
     try {

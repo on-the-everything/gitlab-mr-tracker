@@ -4,6 +4,9 @@ const CONFIG_KEY = 'gitlab_mr_config';
 const MR_LIST_KEY = 'gitlab_mr_list';
 const LAST_UPDATED_KEY = 'gitlab_mr_last_updated';
 const STATUS_FILTERS_KEY = 'gitlab_mr_status_filters';
+const LABEL_FILTERS_KEY = 'gitlab_mr_label_filters';
+const SELECTED_REPOSITORY_KEY = 'gitlab_mr_selected_repository';
+const SELECTED_REPOSITORY_GROUPS_KEY = 'gitlab_mr_selected_repository_groups';
 const MR_READ_TIMESTAMPS_KEY = 'gitlab_mr_read_timestamps';
 
 export const storage = {
@@ -94,6 +97,54 @@ export const storage = {
       localStorage.setItem(STATUS_FILTERS_KEY, JSON.stringify(filters));
     } catch (error) {
       console.error('Failed to save status filters:', error);
+    }
+  },
+
+  getLabelFilters(): string[] {
+    try {
+      const item = localStorage.getItem(LABEL_FILTERS_KEY);
+      if (!item) return [];
+      return JSON.parse(item) as string[];
+    } catch {
+      return [];
+    }
+  },
+
+  saveLabelFilters(filters: string[]): void {
+    try {
+      localStorage.setItem(LABEL_FILTERS_KEY, JSON.stringify(filters));
+    } catch (error) {
+      console.error('Failed to save label filters:', error);
+    }
+  },
+
+  getSelectedRepository(): string {
+    return localStorage.getItem(SELECTED_REPOSITORY_KEY) || '';
+  },
+
+  saveSelectedRepository(repository: string): void {
+    try {
+      localStorage.setItem(SELECTED_REPOSITORY_KEY, repository);
+    } catch (error) {
+      console.error('Failed to save selected repository:', error);
+    }
+  },
+
+  getSelectedRepositoryGroups(): string[] {
+    try {
+      const item = localStorage.getItem(SELECTED_REPOSITORY_GROUPS_KEY);
+      if (!item) return [];
+      return JSON.parse(item) as string[];
+    } catch {
+      return [];
+    }
+  },
+
+  saveSelectedRepositoryGroups(groups: string[]): void {
+    try {
+      localStorage.setItem(SELECTED_REPOSITORY_GROUPS_KEY, JSON.stringify(groups));
+    } catch (error) {
+      console.error('Failed to save selected repository groups:', error);
     }
   },
 
