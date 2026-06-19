@@ -32,6 +32,13 @@ export function NavBar({ loading, lastUpdated, onRefresh, onOpenConfig }: NavBar
                         🎯 Merged → UAT
                     </Link>
                     <Link
+                        to="/release-checklist"
+                        className="px-4 py-2 bg-red-100 text-red-800 rounded-lg hover:bg-red-200 transition-colors"
+                        title="Check sprint MRs before UAT or PROD deploy"
+                    >
+                        🚦 Release Checklist
+                    </Link>
+                    <Link
                         to="/compare-develop-master"
                         className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors"
                         title="Compare develop → master"

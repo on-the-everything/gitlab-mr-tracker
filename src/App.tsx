@@ -11,6 +11,7 @@ import MergedUATPage from './pages/MergedUATPage';
 import CompareBranchesPage from './pages/CompareBranchesPage';
 import FeaturePage from './pages/Feature';
 import UtilsPage from './pages/UtilsPage';
+import ReleaseChecklistPage from './pages/ReleaseChecklistPage';
 
 import { MRStatus } from './types';
 import { storage } from './services/storage';
@@ -46,6 +47,9 @@ function App() {
     }
     return filters;
   });
+  const [statusFilters, setStatusFilters] = useState<Record<MRStatus, boolean>>(() =>
+    storage.getStatusFilters(),
+  );
 
   // Save status filters to storage
   useEffect(() => {
@@ -367,6 +371,23 @@ function App() {
                 hasNewComments={(mr) => hasNewComments(mr)}
                 isRead={(id) => isRead(id)}
                 onBack={() => navigate('/')}
+                selectedRepository={selectedRepository}
+                repositoryGroups={config.repositoryGroups}
+                selectedRepositoryGroups={selectedRepositoryGroups}
+              />
+            )}
+          />
+          <Route
+            path="/release-checklist"
+            element={(
+              <ReleaseChecklistPage
+                mrList={mrList}
+                onMarkAsRead={markMRAsRead}
+                onMarkAsUnread={markMRAsUnread}
+                hasNewComments={(mr) => hasNewComments(mr)}
+                isRead={(id) => isRead(id)}
+                labelFilters={labelFilters}
+                onLabelClick={(label) => setLabelFilters((prev) => prev.includes(label) ? prev : [...prev, label])}
                 selectedRepository={selectedRepository}
                 repositoryGroups={config.repositoryGroups}
                 selectedRepositoryGroups={selectedRepositoryGroups}
