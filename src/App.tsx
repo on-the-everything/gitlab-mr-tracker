@@ -78,6 +78,31 @@ function App() {
     }
   }, [mrList]);
 
+  const availableLabels = useMemo(() => {
+    const labelsByKey = new Map<string, { label: string; count: number }>();
+
+    mrList.forEach((mr) => {
+      mr.labels?.forEach((label) => {
+        const trimmedLabel = label.trim();
+        if (!trimmedLabel) return;
+
+        const key = trimmedLabel.toLowerCase();
+        const current = labelsByKey.get(key);
+
+        if (current) {
+          current.count += 1;
+        } else {
+          labelsByKey.set(key, { label: trimmedLabel, count: 1 });
+        }
+      });
+    });
+
+    return Array.from(labelsByKey.values()).sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return a.label.localeCompare(b.label);
+    });
+  }, [mrList]);
+
   // Update status filters when fetchClosedMRs changes
   useEffect(() => {
     if (!config.fetchClosedMRs) {
@@ -283,6 +308,7 @@ function App() {
             selectedRepositoryGroups={selectedRepositoryGroups}
             onRepositoryGroupChange={handleRepositoryGroupChange}
             labelFilters={labelFilters}
+            availableLabels={availableLabels}
             onResetFilters={handleResetFilters}
             onAddLabel={(v) => setLabelFilters((prev) => prev.includes(v) ? prev : [...prev, v])}
             onRemoveLabel={(v) => setLabelFilters((prev) => prev.filter((p) => p !== v))}

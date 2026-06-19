@@ -12,6 +12,7 @@ interface FilterControlsProps {
   selectedRepositoryGroups?: string[];
   onRepositoryGroupChange?: (groupName: string, selected: boolean) => void;
   labelFilters?: string[];
+  availableLabels?: Array<{ label: string; count: number }>;
   onAddLabel?: (value: string) => void;
   onRemoveLabel?: (value: string) => void;
   onClearLabels?: () => void;
@@ -41,6 +42,7 @@ export function FilterControls({
   selectedRepositoryGroups,
   onRepositoryGroupChange,
   labelFilters,
+  availableLabels,
   onAddLabel,
   onRemoveLabel,
   onClearLabels,
@@ -96,6 +98,10 @@ export function FilterControls({
     );
   }, [repositoryList, repositorySearch]);
 
+  const selectedLabelKeys = React.useMemo(() => {
+    return new Set((labelFilters ?? []).map((label) => label.trim().toLowerCase()));
+  }, [labelFilters]);
+
   const visibleRepositoryGroups = React.useMemo(() => {
     return (repositoryGroups ?? []).filter(
       (group) =>
@@ -149,6 +155,19 @@ export function FilterControls({
       }
       e.preventDefault();
     }
+  };
+
+  const handleAvailableLabelClick = (label: string) => {
+    const selectedLabel = (labelFilters ?? []).find(
+      (currentLabel) => currentLabel.trim().toLowerCase() === label.toLowerCase(),
+    );
+
+    if (selectedLabel) {
+      onRemoveLabel?.(selectedLabel);
+      return;
+    }
+
+    onAddLabel?.(label);
   };
 
   const handleResetFilters = () => {
@@ -230,7 +249,8 @@ export function FilterControls({
         </div>
 
         {labelFilters && labelFilters.length > 0 && (
-          <div className="flex items-center gap-2 mt-2 w-full">
+          <div className="flex items-center gap-2 mt-2 w-full flex-wrap">
+            <span className="text-sm font-medium text-gray-700">Selected labels:</span>
             {labelFilters.map((lab) => (
               <span key={lab} className="inline-flex items-center bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-200">
                 <span className="mr-2">{lab}</span>
@@ -245,6 +265,40 @@ export function FilterControls({
             ))}
           </div>
         )}
+
+        {availableLabels && availableLabels.length > 0 && (
+          <div className="w-full mt-2">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="text-sm font-medium text-gray-700">Available labels:</span>
+              <span className="text-xs text-gray-500">{availableLabels.length} labels from loaded MRs</span>
+            </div>
+            <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-2">
+              {availableLabels.map(({ label, count }) => {
+                const isSelected = selectedLabelKeys.has(label.toLowerCase());
+
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => handleAvailableLabelClick(label)}
+                    className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${isSelected
+                        ? 'border-blue-300 bg-blue-100 text-blue-800'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-800'
+                      }`}
+                    aria-pressed={isSelected}
+                    title={`Filter by ${label}`}
+                  >
+                    <span>{label}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 ${isSelected ? 'bg-blue-200 text-blue-800' : 'bg-gray-100 text-gray-500'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {repositoryList && repositoryList.length > 0 && (
           <div className="flex items-center gap-2 w-full mt-2">
             <label className="text-sm font-medium text-gray-700">Repository:</label>
