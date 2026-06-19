@@ -47,9 +47,6 @@ function App() {
     }
     return filters;
   });
-  const [statusFilters, setStatusFilters] = useState<Record<MRStatus, boolean>>(() =>
-    storage.getStatusFilters(),
-  );
 
   // Save status filters to storage
   useEffect(() => {
