@@ -3,8 +3,9 @@ import { MRTable } from '../../components/MRTable/MRTable';
 import { useConfig } from '../../hooks/useConfig';
 import { fetchRepositoryCompare } from '../../services/gitlabApi';
 import { MergeRequest, MRStatus, type RepositoryGroup } from '../../types';
-import { extractJiraTickets } from '../../utils/jira';
+import { buildJiraTicketUrl, extractJiraTickets } from '../../utils/jira';
 import { filterMRsByRepositoryGroups } from '../../utils/repositoryGroups';
+import { splitRepositoryPath } from '../../utils/repositoryFormatter';
 
 interface ReleaseChecklistPageProps {
   mrList: MergeRequest[];
@@ -21,6 +22,17 @@ interface ReleaseChecklistPageProps {
 
 type ReadinessLevel = 'ready' | 'attention' | 'blocked';
 
+interface ReleaseExportGroup {
+  repository: string;
+  displayName: string;
+  items: ReleaseExportItem[];
+}
+
+interface ReleaseExportItem {
+  jiraTickets: string[];
+  featureName: string;
+}
+
 function countByStatus(mrs: MergeRequest[]) {
   return {
     total: mrs.length,
@@ -34,6 +46,81 @@ function countByStatus(mrs: MergeRequest[]) {
 
 function getJiraTickets(mr: MergeRequest) {
   return extractJiraTickets(mr.sourceBranch, mr.title, mr.description);
+}
+
+function getShortFeatureName(mr: MergeRequest) {
+  const jiraPattern = /[A-Z][A-Z0-9]+-\d+/gi;
+  const mergePrefixPattern = /^(draft:\s*)?(\[.*?\]\s*)?(feat|fix|chore|refactor|hotfix|release|merge|revert)(\(.+?\))?:\s*/i;
+  const branchFallback = mr.sourceBranch
+    ?.replace(jiraPattern, '')
+    .replace(/[-_/]+/g, ' ')
+    .trim();
+
+  const cleaned = mr.title
+    .replace(jiraPattern, '')
+    .replace(mergePrefixPattern, '')
+    .replace(/\s*[-:|]\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const featureName = cleaned || branchFallback || `MR !${mr.iid}`;
+
+  return featureName.length > 90 ? `${featureName.slice(0, 87).trim()}...` : featureName;
+}
+
+function buildReleaseExportGroups(mrs: MergeRequest[]): ReleaseExportGroup[] {
+  const groups = new Map<string, { displayName: string; items: ReleaseExportItem[]; repository: string }>();
+
+  mrs.forEach((mr) => {
+    const repository = mr.repository || 'unknown';
+    const repositoryParts = splitRepositoryPath(repository);
+    const displayName = repositoryParts?.projectName || repository;
+    const item = {
+      jiraTickets: getJiraTickets(mr),
+      featureName: getShortFeatureName(mr),
+    };
+
+    if (!groups.has(repository)) {
+      groups.set(repository, { displayName, items: [], repository });
+    }
+
+    groups.get(repository)!.items.push(item);
+  });
+
+  return Array.from(groups.values())
+    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+    .map((group) => {
+      const items = [...group.items].sort((a, b) => {
+        const aTicket = a.jiraTickets[0] || 'No Jira';
+        const bTicket = b.jiraTickets[0] || 'No Jira';
+        return `${aTicket} ${a.featureName}`.localeCompare(`${bTicket} ${b.featureName}`);
+      });
+      return {
+        ...group,
+        items,
+      };
+    });
+}
+
+function formatReleaseExportGroup(
+  group: ReleaseExportGroup,
+  options: { jiraHost?: string; useFullJiraUrl: boolean },
+) {
+  const lines = group.items.map((item) => {
+    const ticketText =
+      item.jiraTickets.length > 0
+        ? item.jiraTickets
+            .map((ticket) => {
+              if (!options.useFullJiraUrl) return ticket;
+              return buildJiraTicketUrl(ticket, options.jiraHost) || ticket;
+            })
+            .join(', ')
+        : 'No Jira';
+
+    return `- ${ticketText}: ${item.featureName}`;
+  });
+
+  return `# ${group.displayName}\n${lines.join('\n')}`;
 }
 
 function getReadinessLevel(
@@ -74,6 +161,7 @@ export function ReleaseChecklistPage({
   const [compareDiffs, setCompareDiffs] = useState<any[]>([]);
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
+  const [exportVisible, setExportVisible] = useState(false);
 
   const scopedMRs = useMemo(() => {
     let next = [...mrList];
@@ -122,6 +210,11 @@ export function ReleaseChecklistPage({
 
   const mergedMRs = useMemo(
     () => scopedMRs.filter((mr) => mr.status === MRStatus.MERGED),
+    [scopedMRs],
+  );
+
+  const releaseExportGroups = useMemo(
+    () => buildReleaseExportGroups(scopedMRs),
     [scopedMRs],
   );
 
@@ -180,10 +273,27 @@ export function ReleaseChecklistPage({
               Scope: <span className="font-medium text-gray-700">{scopeLabel}</span>
             </div>
           </div>
-          <div className={`inline-flex w-fit items-center rounded border px-3 py-2 text-sm font-semibold ${readinessStyles[readinessLevel]}`}>
-            {readinessLabels[readinessLevel]}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={() => setExportVisible(true)}
+              disabled={scopedMRs.length === 0}
+              className="inline-flex w-fit items-center rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+            >
+              Export Result
+            </button>
+            <div className={`inline-flex w-fit items-center rounded border px-3 py-2 text-sm font-semibold ${readinessStyles[readinessLevel]}`}>
+              {readinessLabels[readinessLevel]}
+            </div>
           </div>
         </div>
+
+        <ReleaseChecklistExportDialog
+          visible={exportVisible}
+          onClose={() => setExportVisible(false)}
+          groups={releaseExportGroups}
+          jiraHost={config.jiraHost}
+        />
 
         <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <SummaryTile label="Total" value={summary.total} />
@@ -358,6 +468,110 @@ function CheckRow({ passed, title, detail }: CheckRowProps) {
       <div>
         <div className="text-sm font-semibold text-gray-900">{title}</div>
         <div className="text-sm text-gray-500">{detail}</div>
+      </div>
+    </div>
+  );
+}
+
+interface ReleaseChecklistExportDialogProps {
+  visible: boolean;
+  onClose: () => void;
+  groups: ReleaseExportGroup[];
+  jiraHost?: string;
+}
+
+function ReleaseChecklistExportDialog({
+  visible,
+  onClose,
+  groups,
+  jiraHost,
+}: ReleaseChecklistExportDialogProps) {
+  const [texts, setTexts] = useState<Record<string, string>>({});
+  const [useFullJiraUrl, setUseFullJiraUrl] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const next: Record<string, string> = {};
+    groups.forEach((group) => {
+      next[group.repository] = formatReleaseExportGroup(group, { jiraHost, useFullJiraUrl });
+    });
+    setTexts(next);
+  }, [groups, jiraHost, useFullJiraUrl, visible]);
+
+  if (!visible) return null;
+
+  const handleCopyAll = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        groups
+          .map(
+            (group) =>
+              texts[group.repository] ||
+              formatReleaseExportGroup(group, { jiraHost, useFullJiraUrl }),
+          )
+          .join('\n\n'),
+      );
+    } catch (e) {
+      console.warn('copy failed', e);
+    }
+  };
+
+  const handleCopy = async (repository: string) => {
+    try {
+      await navigator.clipboard.writeText(texts[repository] || '');
+    } catch (e) {
+      console.warn('copy failed', e);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-20">
+      <div className="fixed inset-0 bg-black opacity-30" onClick={onClose} />
+      <div className="relative max-h-[80vh] w-full max-w-3xl overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="flex items-center justify-between border-b p-4">
+          <h2 className="text-lg font-semibold">Export Release Checklist</h2>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={useFullJiraUrl}
+                onChange={(e) => setUseFullJiraUrl(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              Full Jira URL
+            </label>
+            <button onClick={handleCopyAll} className="rounded bg-green-600 px-3 py-1 text-white">Copy all</button>
+            <button onClick={onClose} className="rounded bg-gray-200 px-3 py-1">Close</button>
+          </div>
+        </div>
+
+        <div className="space-y-4 p-4">
+          {groups.map((group) => (
+            <div key={group.repository} className="rounded border bg-gray-50 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-medium">{group.displayName}</div>
+                  <div className="text-sm text-gray-500">{group.repository}</div>
+                </div>
+                <button
+                  onClick={() => handleCopy(group.repository)}
+                  className="rounded bg-blue-600 px-2 py-1 text-sm text-white"
+                >
+                  Copy
+                </button>
+              </div>
+              <textarea
+                aria-label={`release-export-${group.displayName}`}
+                value={texts[group.repository] || ''}
+                onChange={(e) =>
+                  setTexts((current) => ({ ...current, [group.repository]: e.target.value }))
+                }
+                className="mt-3 min-h-[120px] w-full resize-vertical rounded border p-2 font-mono text-sm"
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
