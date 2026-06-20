@@ -11,6 +11,11 @@ interface FilterControlsProps {
   repositoryGroups?: RepositoryGroup[];
   selectedRepositoryGroups?: string[];
   onRepositoryGroupChange?: (groupName: string, selected: boolean) => void;
+  teamScopeFilters?: Record<'myTeam' | 'partnerTeam', boolean>;
+  onTeamScopeFilterChange?: (
+    scope: 'myTeam' | 'partnerTeam',
+    selected: boolean,
+  ) => void;
   labelFilters?: string[];
   availableLabels?: Array<{ label: string; count: number }>;
   onAddLabel?: (value: string) => void;
@@ -41,6 +46,8 @@ export function FilterControls({
   repositoryGroups,
   selectedRepositoryGroups,
   onRepositoryGroupChange,
+  teamScopeFilters,
+  onTeamScopeFilterChange,
   labelFilters,
   availableLabels,
   onAddLabel,
@@ -185,6 +192,8 @@ export function FilterControls({
     selectedRepositoryGroups?.forEach((groupName) =>
       onRepositoryGroupChange?.(groupName, false),
     );
+    onTeamScopeFilterChange?.('myTeam', true);
+    onTeamScopeFilterChange?.('partnerTeam', true);
     onFetchTimeUnitChange('weeks');
     onFetchTimeValueChange(4);
   };
@@ -376,6 +385,33 @@ export function FilterControls({
                 <span className="text-sm">{group.name}</span>
               </label>
             ))}
+          </div>
+        )}
+        {teamScopeFilters && onTeamScopeFilterChange && (
+          <div className="flex items-center gap-2 flex-wrap w-full mt-2">
+            <span className="text-sm font-medium text-gray-700">Team scope:</span>
+            <label className="flex items-center gap-2 px-3 py-1 rounded cursor-pointer hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={teamScopeFilters.myTeam}
+                onChange={(e) =>
+                  onTeamScopeFilterChange('myTeam', e.target.checked)
+                }
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm">My team</span>
+            </label>
+            <label className="flex items-center gap-2 px-3 py-1 rounded cursor-pointer hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={teamScopeFilters.partnerTeam}
+                onChange={(e) =>
+                  onTeamScopeFilterChange('partnerTeam', e.target.checked)
+                }
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm">Partner team</span>
+            </label>
           </div>
         )}
         <div className="flex items-center gap-2 ml-2">

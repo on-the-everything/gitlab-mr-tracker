@@ -45,7 +45,12 @@ export function useAutoRefresh(
         }
 
         // Fetch new MRs from auto-subscribed accounts
-        if (onSubscribe && (config.myAccount || config.teamAccounts.length > 0)) {
+        if (
+          onSubscribe &&
+          (config.myAccount ||
+            config.myTeamAccounts.length > 0 ||
+            config.partnerTeamAccounts.length > 0)
+        ) {
           onSubscribe();
         }
       } catch (error) {
@@ -63,6 +68,14 @@ export function useAutoRefresh(
         clearInterval(intervalRef.current);
       }
     };
-  }, [config.autoRefreshInterval, config.accessToken, config.myAccount, config.teamAccounts, mrList, onUpdate, onSubscribe]);
+  }, [
+    config.autoRefreshInterval,
+    config.accessToken,
+    config.myAccount,
+    config.myTeamAccounts,
+    config.partnerTeamAccounts,
+    mrList,
+    onUpdate,
+    onSubscribe,
+  ]);
 }
-

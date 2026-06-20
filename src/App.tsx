@@ -17,6 +17,8 @@ import { MRStatus } from './types';
 import { storage } from './services/storage';
 import { filterMRsByRepositoryGroups } from './utils/repositoryGroups';
 
+type TeamScope = 'myTeam' | 'partnerTeam';
+
 function App() {
   const { config, saveConfig } = useConfig();
   const {
@@ -57,6 +59,9 @@ function App() {
   const [labelFilters, setLabelFilters] = useState<string[]>(() => storage.getLabelFilters());
   const [selectedRepository, setSelectedRepository] = useState<string>(() => storage.getSelectedRepository());
   const [selectedRepositoryGroups, setSelectedRepositoryGroups] = useState<string[]>(() => storage.getSelectedRepositoryGroups());
+  const [teamScopeFilters, setTeamScopeFilters] = useState<Record<TeamScope, boolean>>(
+    () => storage.getTeamScopeFilters(),
+  );
 
   useEffect(() => {
     storage.saveLabelFilters(labelFilters);
@@ -69,6 +74,10 @@ function App() {
   useEffect(() => {
     storage.saveSelectedRepositoryGroups(selectedRepositoryGroups);
   }, [selectedRepositoryGroups]);
+
+  useEffect(() => {
+    storage.saveTeamScopeFilters(teamScopeFilters);
+  }, [teamScopeFilters]);
 
   const repositories = useMemo(() => {
     try {
@@ -133,7 +142,11 @@ function App() {
 
   // Auto-subscribe when config changes
   useEffect(() => {
-    if (config.myAccount || config.teamAccounts.length > 0) {
+    if (
+      config.myAccount ||
+      config.myTeamAccounts.length > 0 ||
+      config.partnerTeamAccounts.length > 0
+    ) {
       // Only auto-subscribe if we have accounts configured
       const timer = setTimeout(() => {
         subscribeToAccounts();
@@ -141,7 +154,11 @@ function App() {
 
       return () => clearTimeout(timer);
     }
-  }, [config.myAccount, config.teamAccounts.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    config.myAccount,
+    config.myTeamAccounts.join(','),
+    config.partnerTeamAccounts.join(','),
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh handler
   useAutoRefresh(config, mrList, updateMRList, subscribeToAccounts);
@@ -207,7 +224,8 @@ function App() {
   // and categorize those results. This ensures filtering uses only local data
   // and does not rely on fetch-time limits.
   let myMRs = [] as typeof categorized.my;
-  let teamMRs = [] as typeof categorized.team;
+  let myTeamMRs = [] as typeof categorized.myTeam;
+  let partnerTeamMRs = [] as typeof categorized.partnerTeam;
   let otherMRs = [] as typeof categorized.other;
 
   const applyRepoFilter = (mrs: typeof categorized.my) => {
@@ -233,11 +251,21 @@ function App() {
     const categorizedFiltered = categorizeMRs(filteredList);
 
     myMRs = applyRepositoryFilters(filterByStatus(filterByClosedMRs(categorizedFiltered.my, true)));
-    teamMRs = applyRepositoryFilters(filterByStatus(filterByClosedMRs(categorizedFiltered.team, true)));
+    myTeamMRs = teamScopeFilters.myTeam
+      ? applyRepositoryFilters(filterByStatus(filterByClosedMRs(categorizedFiltered.myTeam, true)))
+      : [];
+    partnerTeamMRs = teamScopeFilters.partnerTeam
+      ? applyRepositoryFilters(filterByStatus(filterByClosedMRs(categorizedFiltered.partnerTeam, true)))
+      : [];
     otherMRs = applyRepositoryFilters(filterByStatus(filterByClosedMRs(categorizedFiltered.other, false)));
   } else {
     myMRs = applyRepositoryFilters(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.my, true), true))));
-    teamMRs = applyRepositoryFilters(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.team, true), true))));
+    myTeamMRs = teamScopeFilters.myTeam
+      ? applyRepositoryFilters(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.myTeam, true), true))))
+      : [];
+    partnerTeamMRs = teamScopeFilters.partnerTeam
+      ? applyRepositoryFilters(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.partnerTeam, true), true))))
+      : [];
     otherMRs = applyRepositoryFilters(filterByLabel(filterByStatus(filterByClosedMRs(filterByFetchTime(categorized.other, false), false))));
   }
 
@@ -267,6 +295,7 @@ function App() {
     setLabelFilters([]);
     setSelectedRepository('');
     setSelectedRepositoryGroups([]);
+    setTeamScopeFilters({ myTeam: true, partnerTeam: true });
     saveConfig({ ...config, fetchTimeUnit: 'weeks', fetchTimeValue: 4 });
   };
 
@@ -278,6 +307,10 @@ function App() {
 
       return prev.filter((name) => name !== groupName);
     });
+  };
+
+  const handleTeamScopeFilterChange = (scope: TeamScope, selected: boolean) => {
+    setTeamScopeFilters((prev) => ({ ...prev, [scope]: selected }));
   };
 
   const handleRefreshClick = () => {
@@ -307,6 +340,8 @@ function App() {
             repositoryGroups={config.repositoryGroups}
             selectedRepositoryGroups={selectedRepositoryGroups}
             onRepositoryGroupChange={handleRepositoryGroupChange}
+            teamScopeFilters={teamScopeFilters}
+            onTeamScopeFilterChange={handleTeamScopeFilterChange}
             labelFilters={labelFilters}
             availableLabels={availableLabels}
             onResetFilters={handleResetFilters}
@@ -340,10 +375,22 @@ function App() {
                   />
                 )}
 
-                {teamMRs.length > 0 && (
+                {myTeamMRs.length > 0 && (
                   <MRTable
-                    title="Team MRs"
-                    mrList={teamMRs}
+                    title="My Team MRs"
+                    mrList={myTeamMRs}
+                    onMarkAsRead={markMRAsRead}
+                    onMarkAsUnread={markMRAsUnread}
+                    hasNewComments={hasNewComments}
+                    isRead={isRead}
+                    onLabelClick={(label) => setLabelFilters((prev) => prev.includes(label) ? prev : [...prev, label])}
+                  />
+                )}
+
+                {partnerTeamMRs.length > 0 && (
+                  <MRTable
+                    title="Partner Team MRs"
+                    mrList={partnerTeamMRs}
                     onMarkAsRead={markMRAsRead}
                     onMarkAsUnread={markMRAsUnread}
                     hasNewComments={hasNewComments}
@@ -414,6 +461,7 @@ function App() {
                 selectedRepository={selectedRepository}
                 repositoryGroups={config.repositoryGroups}
                 selectedRepositoryGroups={selectedRepositoryGroups}
+                teamScopeFilters={teamScopeFilters}
               />
             )}
           />
@@ -432,7 +480,7 @@ function App() {
         </Routes>
 
         {/* Empty State */}
-        {myMRs.length === 0 && teamMRs.length === 0 && otherMRs.length === 0 && (
+        {myMRs.length === 0 && myTeamMRs.length === 0 && partnerTeamMRs.length === 0 && otherMRs.length === 0 && (
           <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow-sm border border-gray-200">
             <p className="text-lg">No merge requests to display.</p>
             <p className="text-sm mt-2">

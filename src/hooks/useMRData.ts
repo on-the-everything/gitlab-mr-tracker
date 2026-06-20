@@ -9,11 +9,12 @@ import {
 } from "../services/gitlabApi";
 import { parseMRUrl } from "../utils/urlParser";
 
-export type MRCategory = "my" | "team" | "other";
+export type MRCategory = "my" | "myTeam" | "partnerTeam" | "other";
 
 export interface CategorizedMRs {
   my: MergeRequest[];
-  team: MergeRequest[];
+  myTeam: MergeRequest[];
+  partnerTeam: MergeRequest[];
   other: MergeRequest[];
 }
 
@@ -59,11 +60,14 @@ export function useMRData(config: AppConfig) {
   const categorizeMRs = useCallback(
     (mrs: MergeRequest[]): CategorizedMRs => {
       const myUsername = normalizeUsername(config.myAccount);
-      const teamUsernames = config.teamAccounts.map(normalizeUsername);
+      const myTeamUsernames = config.myTeamAccounts.map(normalizeUsername);
+      const partnerTeamUsernames =
+        config.partnerTeamAccounts.map(normalizeUsername);
 
       const categorized: CategorizedMRs = {
         my: [],
-        team: [],
+        myTeam: [],
+        partnerTeam: [],
         other: [],
       };
 
@@ -73,10 +77,15 @@ export function useMRData(config: AppConfig) {
         if (myUsername && authorUsername === myUsername) {
           categorized.my.push(mr);
         } else if (
-          teamUsernames.length > 0 &&
-          teamUsernames.includes(authorUsername)
+          myTeamUsernames.length > 0 &&
+          myTeamUsernames.includes(authorUsername)
         ) {
-          categorized.team.push(mr);
+          categorized.myTeam.push(mr);
+        } else if (
+          partnerTeamUsernames.length > 0 &&
+          partnerTeamUsernames.includes(authorUsername)
+        ) {
+          categorized.partnerTeam.push(mr);
         } else {
           categorized.other.push(mr);
         }
@@ -90,12 +99,13 @@ export function useMRData(config: AppConfig) {
       };
 
       categorized.my.sort(sortByCreated);
-      categorized.team.sort(sortByCreated);
+      categorized.myTeam.sort(sortByCreated);
+      categorized.partnerTeam.sort(sortByCreated);
       categorized.other.sort(sortByCreated);
 
       return categorized;
     },
-    [config.myAccount, config.teamAccounts],
+    [config.myAccount, config.myTeamAccounts, config.partnerTeamAccounts],
   );
 
   const addMR = useCallback(
@@ -240,8 +250,13 @@ export function useMRData(config: AppConfig) {
         }
       }
 
+      const configuredTeamAccounts = [
+        ...config.myTeamAccounts,
+        ...config.partnerTeamAccounts,
+      ];
+
       // Fetch team account MRs
-      for (const teamAccount of config.teamAccounts) {
+      for (const teamAccount of configuredTeamAccounts) {
         if (!teamAccount.trim()) continue;
         try {
           const teamMRs = await fetchMRsByAuthor(config, teamAccount);
@@ -270,7 +285,7 @@ export function useMRData(config: AppConfig) {
       const existingMRs = mrList.filter((mr) => {
         const authorUsername = normalizeUsername(mr.author.username);
         const myUsername = normalizeUsername(config.myAccount);
-        const teamUsernames = config.teamAccounts.map(normalizeUsername);
+        const teamUsernames = configuredTeamAccounts.map(normalizeUsername);
 
         return (
           authorUsername !== myUsername &&

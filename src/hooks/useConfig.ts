@@ -8,7 +8,8 @@ const DEFAULT_CONFIG: AppConfig = {
   accessToken: "",
   autoRefreshInterval: 60,
   myAccount: "",
-  teamAccounts: [],
+  myTeamAccounts: [],
+  partnerTeamAccounts: [],
   fetchTimeUnit: "weeks",
   fetchTimeValue: 2,
   fetchClosedMRs: false,
@@ -19,7 +20,9 @@ function migrateConfig(saved: Partial<AppConfig>): AppConfig {
   return {
     ...DEFAULT_CONFIG,
     ...saved,
-    teamAccounts: saved.teamAccounts || [],
+    myTeamAccounts: saved.myTeamAccounts || saved.teamAccounts || [],
+    partnerTeamAccounts: saved.partnerTeamAccounts || [],
+    teamAccounts: undefined,
     fetchTimeUnit: saved.fetchTimeUnit || "weeks",
     fetchTimeValue: saved.fetchTimeValue || 2,
     fetchClosedMRs:
@@ -44,6 +47,8 @@ export function useConfig() {
         !saved.fetchTimeUnit ||
         !saved.fetchTimeValue ||
         saved.fetchClosedMRs === undefined ||
+        saved.myTeamAccounts === undefined ||
+        saved.partnerTeamAccounts === undefined ||
         saved.repositoryGroups === undefined;
 
       if (needsMigration) {
