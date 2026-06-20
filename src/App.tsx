@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useConfig } from './hooks/useConfig';
 import { useMRData } from './hooks/useMRData';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
+import { buildMRsByAuthorQueryUrl } from './services/gitlabApi';
 import NavBar from './components/NavBar/NavBar';
 import { ConfigModal } from './components/ConfigModal/ConfigModal';
 import { MRTable } from './components/MRTable/MRTable';
@@ -111,6 +112,27 @@ function App() {
       return a.label.localeCompare(b.label);
     });
   }, [mrList]);
+
+  const gitlabQueryOptions = useMemo(() => {
+    const configuredAccounts = [
+      { label: 'My account', username: config.myAccount },
+      ...config.myTeamAccounts.map((username) => ({
+        label: 'My team',
+        username,
+      })),
+      ...config.partnerTeamAccounts.map((username) => ({
+        label: 'Partner team',
+        username,
+      })),
+    ].filter(({ username }) => username.trim());
+
+    return configuredAccounts.map(({ label, username }) => ({
+      label,
+      username,
+      url: buildMRsByAuthorQueryUrl(config, username),
+      includesClosedMRs: config.fetchClosedMRs,
+    }));
+  }, [config]);
 
   // Update status filters when fetchClosedMRs changes
   useEffect(() => {
@@ -342,6 +364,7 @@ function App() {
             onRepositoryGroupChange={handleRepositoryGroupChange}
             teamScopeFilters={teamScopeFilters}
             onTeamScopeFilterChange={handleTeamScopeFilterChange}
+            gitlabQueryOptions={gitlabQueryOptions}
             labelFilters={labelFilters}
             availableLabels={availableLabels}
             onResetFilters={handleResetFilters}

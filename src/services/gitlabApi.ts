@@ -210,37 +210,43 @@ function parseMRUrlFromId(id: string): ParsedMRUrl | null {
   }
 }
 
+function getCreatedAfterDateString(config: AppConfig, now = new Date()): string {
+  const fetchTimeMultiplier =
+    config.fetchTimeUnit === "days"
+      ? 24 * 60 * 60 * 1000
+      : 7 * 24 * 60 * 60 * 1000;
+  const createdAfter = new Date(
+    now.getTime() - config.fetchTimeValue * fetchTimeMultiplier,
+  );
+
+  return createdAfter.toISOString().split("T")[0];
+}
+
+export function buildMRsByAuthorQueryUrl(
+  config: AppConfig,
+  username: string,
+  now = new Date(),
+): string {
+  const cleanUsername = username.startsWith("@") ? username.slice(1) : username;
+  const baseUrl = `${config.gitlabHost}/api/v4/merge_requests`;
+  const params = new URLSearchParams({
+    author_username: cleanUsername,
+    scope: "all",
+    created_after: getCreatedAfterDateString(config, now),
+    per_page: "100",
+  });
+
+  return `${baseUrl}?${params.toString()}`;
+}
+
 export async function fetchMRsByAuthor(
   config: AppConfig,
   username: string,
 ): Promise<MergeRequest[]> {
-  // Remove @ if present
-  const cleanUsername = username.startsWith("@") ? username.slice(1) : username;
-
-  // Calculate created_after date based on fetch time limit
-  const now = new Date();
-  let createdAfter: Date;
-
-  if (config.fetchTimeUnit === "days") {
-    createdAfter = new Date(
-      now.getTime() - config.fetchTimeValue * 24 * 60 * 60 * 1000,
-    );
-  } else {
-    // weeks
-    createdAfter = new Date(
-      now.getTime() - config.fetchTimeValue * 7 * 24 * 60 * 60 * 1000,
-    );
-  }
-
-  // Format date as ISO 8601 (GitLab API format)
-  const createdAfterStr = createdAfter.toISOString().split("T")[0];
-
-  const baseUrl = `${config.gitlabHost}/api/v4/merge_requests`;
-
   // Fetch MRs within time limit
   // Note: GitLab API doesn't support filtering by multiple states in one request,
   // so we fetch all states and filter client-side based on fetchClosedMRs config
-  const url = `${baseUrl}?author_username=${encodeURIComponent(cleanUsername)}&scope=all&created_after=${createdAfterStr}&per_page=100`;
+  const url = buildMRsByAuthorQueryUrl(config, username);
 
   try {
     const response = await fetchGitLabAPI(url, config.accessToken);
