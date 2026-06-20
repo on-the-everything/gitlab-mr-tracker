@@ -38,7 +38,14 @@ function normalizeConfig(config: Partial<AppConfig>): AppConfig {
     accessToken: config.accessToken || '',
     autoRefreshInterval: config.autoRefreshInterval || 60,
     myAccount: config.myAccount || '',
-    teamAccounts: Array.isArray(config.teamAccounts) ? config.teamAccounts : [],
+    myTeamAccounts: Array.isArray(config.myTeamAccounts)
+      ? config.myTeamAccounts
+      : Array.isArray(config.teamAccounts)
+        ? config.teamAccounts
+        : [],
+    partnerTeamAccounts: Array.isArray(config.partnerTeamAccounts)
+      ? config.partnerTeamAccounts
+      : [],
     fetchTimeUnit:
       config.fetchTimeUnit === 'days' || config.fetchTimeUnit === 'weeks'
         ? config.fetchTimeUnit
@@ -71,7 +78,9 @@ function sanitizeConfig(config: AppConfig): AppConfig {
     gitlabHost: config.gitlabHost.trim(),
     jiraHost: config.jiraHost?.trim() || '',
     myAccount: config.myAccount.trim(),
-    teamAccounts: config.teamAccounts.map((account) => account.trim()).filter(Boolean),
+    myTeamAccounts: config.myTeamAccounts.map((account) => account.trim()).filter(Boolean),
+    partnerTeamAccounts: config.partnerTeamAccounts.map((account) => account.trim()).filter(Boolean),
+    teamAccounts: undefined,
     repositoryGroups: normalizeRepositoryGroups(config.repositoryGroups).filter(
       (group) => group.name && group.repositories.length > 0,
     ),
@@ -458,18 +467,18 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Team Accounts
+                My Team Accounts
               </label>
               <div className="space-y-2">
-                {formData.teamAccounts.map((account, index) => (
+                {formData.myTeamAccounts.map((account, index) => (
                   <div key={index} className="flex gap-2">
                     <input
                       type="text"
                       value={account}
                       onChange={(e) => {
-                        const newAccounts = [...formData.teamAccounts];
+                        const newAccounts = [...formData.myTeamAccounts];
                         newAccounts[index] = e.target.value;
-                        setFormData({ ...formData, teamAccounts: newAccounts });
+                        setFormData({ ...formData, myTeamAccounts: newAccounts });
                       }}
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="@teammate"
@@ -477,8 +486,8 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
                     <button
                       type="button"
                       onClick={() => {
-                        const newAccounts = formData.teamAccounts.filter((_, i) => i !== index);
-                        setFormData({ ...formData, teamAccounts: newAccounts });
+                        const newAccounts = formData.myTeamAccounts.filter((_, i) => i !== index);
+                        setFormData({ ...formData, myTeamAccounts: newAccounts });
                       }}
                       className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     >
@@ -491,16 +500,64 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
                   onClick={() => {
                     setFormData({
                       ...formData,
-                      teamAccounts: [...formData.teamAccounts, ''],
+                      myTeamAccounts: [...formData.myTeamAccounts, ''],
                     });
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
                 >
-                  + Add Team Account
+                  + Add My Team Account
                 </button>
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                Team member usernames. MRs from these accounts will appear in "Team MRs" table.
+                My team member usernames. MRs from these accounts will appear in "My Team MRs" table.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Partner Team Accounts
+              </label>
+              <div className="space-y-2">
+                {formData.partnerTeamAccounts.map((account, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={account}
+                      onChange={(e) => {
+                        const newAccounts = [...formData.partnerTeamAccounts];
+                        newAccounts[index] = e.target.value;
+                        setFormData({ ...formData, partnerTeamAccounts: newAccounts });
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="@partner"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newAccounts = formData.partnerTeamAccounts.filter((_, i) => i !== index);
+                        setFormData({ ...formData, partnerTeamAccounts: newAccounts });
+                      }}
+                      className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      partnerTeamAccounts: [...formData.partnerTeamAccounts, ''],
+                    });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                >
+                  + Add Partner Team Account
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Partner team usernames. MRs from these accounts will appear in "Partner Team MRs" table.
               </p>
             </div>
 

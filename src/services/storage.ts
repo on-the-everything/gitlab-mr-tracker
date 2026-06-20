@@ -7,6 +7,7 @@ const STATUS_FILTERS_KEY = 'gitlab_mr_status_filters';
 const LABEL_FILTERS_KEY = 'gitlab_mr_label_filters';
 const SELECTED_REPOSITORY_KEY = 'gitlab_mr_selected_repository';
 const SELECTED_REPOSITORY_GROUPS_KEY = 'gitlab_mr_selected_repository_groups';
+const TEAM_SCOPE_FILTERS_KEY = 'gitlab_mr_team_scope_filters';
 const MR_READ_TIMESTAMPS_KEY = 'gitlab_mr_read_timestamps';
 
 export const storage = {
@@ -148,6 +149,31 @@ export const storage = {
     }
   },
 
+  getTeamScopeFilters(): Record<'myTeam' | 'partnerTeam', boolean> {
+    try {
+      const item = localStorage.getItem(TEAM_SCOPE_FILTERS_KEY);
+      if (!item) {
+        return { myTeam: true, partnerTeam: true };
+      }
+
+      const filters = JSON.parse(item) as Partial<Record<'myTeam' | 'partnerTeam', boolean>>;
+      return {
+        myTeam: filters.myTeam ?? true,
+        partnerTeam: filters.partnerTeam ?? true,
+      };
+    } catch {
+      return { myTeam: true, partnerTeam: true };
+    }
+  },
+
+  saveTeamScopeFilters(filters: Record<'myTeam' | 'partnerTeam', boolean>): void {
+    try {
+      localStorage.setItem(TEAM_SCOPE_FILTERS_KEY, JSON.stringify(filters));
+    } catch (error) {
+      console.error('Failed to save team scope filters:', error);
+    }
+  },
+
   getMRReadTimestamps(): Record<string, string> {
     try {
       const item = localStorage.getItem(MR_READ_TIMESTAMPS_KEY);
@@ -176,4 +202,3 @@ export const storage = {
     }
   },
 };
-

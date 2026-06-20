@@ -58,7 +58,9 @@ export interface AppConfig {
   accessToken: string;
   autoRefreshInterval: number;
   myAccount: string;
-  teamAccounts: string[];
+  myTeamAccounts: string[];
+  partnerTeamAccounts: string[];
+  teamAccounts?: string[];
   fetchTimeUnit: "days" | "weeks";
   fetchTimeValue: number;
   fetchClosedMRs: boolean;

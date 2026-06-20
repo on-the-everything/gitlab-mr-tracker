@@ -11,6 +11,17 @@ interface FilterControlsProps {
   repositoryGroups?: RepositoryGroup[];
   selectedRepositoryGroups?: string[];
   onRepositoryGroupChange?: (groupName: string, selected: boolean) => void;
+  teamScopeFilters?: Record<'myTeam' | 'partnerTeam', boolean>;
+  onTeamScopeFilterChange?: (
+    scope: 'myTeam' | 'partnerTeam',
+    selected: boolean,
+  ) => void;
+  gitlabQueryOptions?: Array<{
+    label: string;
+    username: string;
+    url: string;
+    includesClosedMRs: boolean;
+  }>;
   labelFilters?: string[];
   availableLabels?: Array<{ label: string; count: number }>;
   onAddLabel?: (value: string) => void;
@@ -41,6 +52,9 @@ export function FilterControls({
   repositoryGroups,
   selectedRepositoryGroups,
   onRepositoryGroupChange,
+  teamScopeFilters,
+  onTeamScopeFilterChange,
+  gitlabQueryOptions,
   labelFilters,
   availableLabels,
   onAddLabel,
@@ -56,6 +70,7 @@ export function FilterControls({
   const [inputValue, setInputValue] = React.useState('');
   const [repositorySearch, setRepositorySearch] = React.useState(selectedRepository ?? '');
   const [isRepositoryMenuOpen, setIsRepositoryMenuOpen] = React.useState(false);
+  const [isQueryInfoOpen, setIsQueryInfoOpen] = React.useState(false);
   const repositorySearchRef = React.useRef<HTMLDivElement>(null);
   const previousSelectedRepositoryRef = React.useRef(selectedRepository ?? '');
 
@@ -174,6 +189,7 @@ export function FilterControls({
     setInputValue('');
     setRepositorySearch('');
     setIsRepositoryMenuOpen(false);
+    setIsQueryInfoOpen(false);
 
     if (onResetFilters) {
       onResetFilters();
@@ -185,6 +201,8 @@ export function FilterControls({
     selectedRepositoryGroups?.forEach((groupName) =>
       onRepositoryGroupChange?.(groupName, false),
     );
+    onTeamScopeFilterChange?.('myTeam', true);
+    onTeamScopeFilterChange?.('partnerTeam', true);
     onFetchTimeUnitChange('weeks');
     onFetchTimeValueChange(4);
   };
@@ -219,6 +237,49 @@ export function FilterControls({
               </label>
             );
           })}
+          {gitlabQueryOptions && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsQueryInfoOpen((isOpen) => !isOpen)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 bg-white text-xs font-bold text-gray-600 hover:border-blue-300 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-expanded={isQueryInfoOpen}
+                aria-label="Show current GitLab query options"
+                title="Show current GitLab query options"
+              >
+                i
+              </button>
+              {isQueryInfoOpen && (
+                <div className="absolute left-0 z-30 mt-2 w-[min(36rem,calc(100vw-2rem))] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+                  <div className="mb-2 text-sm font-semibold text-gray-900">
+                    Current GitLab queries
+                  </div>
+                  {gitlabQueryOptions.length > 0 ? (
+                    <div className="space-y-3">
+                      {gitlabQueryOptions.map((option) => (
+                        <div key={`${option.label}-${option.username}`} className="rounded border border-gray-100 bg-gray-50 p-2">
+                          <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                            <span className="font-semibold text-gray-800">{option.label}</span>
+                            <span>{option.username}</span>
+                            <span>
+                              closed MRs {option.includesClosedMRs ? 'included' : 'filtered after fetch'}
+                            </span>
+                          </div>
+                          <code className="block break-all rounded bg-white p-2 text-xs text-gray-700">
+                            {option.url}
+                          </code>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500">
+                      No configured accounts.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="w-full flex items-center gap-2 mt-2">
           <label className="text-sm font-medium text-gray-700">Label filter:</label>
@@ -376,6 +437,33 @@ export function FilterControls({
                 <span className="text-sm">{group.name}</span>
               </label>
             ))}
+          </div>
+        )}
+        {teamScopeFilters && onTeamScopeFilterChange && (
+          <div className="flex items-center gap-2 flex-wrap w-full mt-2">
+            <span className="text-sm font-medium text-gray-700">Team scope:</span>
+            <label className="flex items-center gap-2 px-3 py-1 rounded cursor-pointer hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={teamScopeFilters.myTeam}
+                onChange={(e) =>
+                  onTeamScopeFilterChange('myTeam', e.target.checked)
+                }
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm">My team</span>
+            </label>
+            <label className="flex items-center gap-2 px-3 py-1 rounded cursor-pointer hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={teamScopeFilters.partnerTeam}
+                onChange={(e) =>
+                  onTeamScopeFilterChange('partnerTeam', e.target.checked)
+                }
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm">Partner team</span>
+            </label>
           </div>
         )}
         <div className="flex items-center gap-2 ml-2">

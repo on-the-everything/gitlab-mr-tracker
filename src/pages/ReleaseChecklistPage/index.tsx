@@ -18,6 +18,7 @@ interface ReleaseChecklistPageProps {
   selectedRepository?: string;
   repositoryGroups?: RepositoryGroup[];
   selectedRepositoryGroups?: string[];
+  teamScopeFilters?: Record<'myTeam' | 'partnerTeam', boolean>;
 }
 
 type ReadinessLevel = 'ready' | 'attention' | 'blocked';
@@ -66,6 +67,12 @@ function getShortFeatureName(mr: MergeRequest) {
   const featureName = cleaned || branchFallback || `MR !${mr.iid}`;
 
   return featureName.length > 90 ? `${featureName.slice(0, 87).trim()}...` : featureName;
+}
+
+function normalizeUsername(username: string): string {
+  return username.startsWith('@')
+    ? username.slice(1).toLowerCase()
+    : username.toLowerCase();
 }
 
 function buildReleaseExportGroups(mrs: MergeRequest[]): ReleaseExportGroup[] {
@@ -156,6 +163,7 @@ export function ReleaseChecklistPage({
   selectedRepository,
   repositoryGroups,
   selectedRepositoryGroups,
+  teamScopeFilters,
 }: ReleaseChecklistPageProps) {
   const { config } = useConfig();
   const [compareDiffs, setCompareDiffs] = useState<any[]>([]);
@@ -181,12 +189,40 @@ export function ReleaseChecklistPage({
       next = next.filter((mr) => mr.repository === selectedRepository);
     }
 
+    if (teamScopeFilters) {
+      const myTeamUsernames = new Set(config.myTeamAccounts.map(normalizeUsername));
+      const partnerTeamUsernames = new Set(config.partnerTeamAccounts.map(normalizeUsername));
+
+      next = next.filter((mr) => {
+        const authorUsername = normalizeUsername(mr.author.username);
+
+        if (!teamScopeFilters.myTeam && myTeamUsernames.has(authorUsername)) {
+          return false;
+        }
+
+        if (!teamScopeFilters.partnerTeam && partnerTeamUsernames.has(authorUsername)) {
+          return false;
+        }
+
+        return true;
+      });
+    }
+
     return filterMRsByRepositoryGroups(
       next,
       repositoryGroups ?? [],
       selectedRepositoryGroups ?? [],
     );
-  }, [mrList, labelFilters, selectedRepository, repositoryGroups, selectedRepositoryGroups]);
+  }, [
+    mrList,
+    labelFilters,
+    selectedRepository,
+    teamScopeFilters,
+    config.myTeamAccounts,
+    config.partnerTeamAccounts,
+    repositoryGroups,
+    selectedRepositoryGroups,
+  ]);
 
   const summary = useMemo(() => countByStatus(scopedMRs), [scopedMRs]);
 
