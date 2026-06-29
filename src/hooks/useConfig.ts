@@ -5,6 +5,9 @@ import { storage } from "../services/storage";
 const DEFAULT_CONFIG: AppConfig = {
   gitlabHost: "https://gitlab.com",
   jiraHost: "",
+  jiraProjectKey: "AZP",
+  jiraEmail: "",
+  jiraAccessToken: "",
   accessToken: "",
   autoRefreshInterval: 60,
   myAccount: "",
@@ -19,12 +22,50 @@ const DEFAULT_CONFIG: AppConfig = {
     sp14: "",
     sp15: "",
   },
+  jiraVersionScopes: [
+    {
+      name: "AMZ 2.12",
+      version: "AMZ 2.12",
+      components: [],
+    },
+  ],
 };
 
+function normalizeJiraVersionScopes(
+  scopes: Partial<AppConfig>["jiraVersionScopes"],
+): AppConfig["jiraVersionScopes"] {
+  if (!Array.isArray(scopes)) {
+    return DEFAULT_CONFIG.jiraVersionScopes;
+  }
+
+  const normalized = scopes
+    .map((scope) => ({
+      name: typeof scope?.name === "string" ? scope.name.trim() : "",
+      version: typeof scope?.version === "string" ? scope.version.trim() : "",
+      components: Array.isArray(scope?.components)
+        ? scope.components
+            .filter((component): component is string => typeof component === "string")
+            .map((component) => component.trim())
+            .filter(Boolean)
+        : [],
+    }))
+    .filter((scope) => scope.name && scope.version);
+
+  return normalized.length > 0 ? normalized : DEFAULT_CONFIG.jiraVersionScopes;
+}
+
 function migrateConfig(saved: Partial<AppConfig>): AppConfig {
+  const savedJiraProjectKey = saved.jiraProjectKey?.trim();
+
   return {
     ...DEFAULT_CONFIG,
     ...saved,
+    jiraProjectKey:
+      !savedJiraProjectKey || savedJiraProjectKey === "AMZ"
+        ? "AZP"
+        : savedJiraProjectKey,
+    jiraEmail: saved.jiraEmail || "",
+    jiraAccessToken: saved.jiraAccessToken || "",
     myTeamAccounts: saved.myTeamAccounts || saved.teamAccounts || [],
     partnerTeamAccounts: saved.partnerTeamAccounts || [],
     teamAccounts: undefined,
@@ -39,6 +80,7 @@ function migrateConfig(saved: Partial<AppConfig>): AppConfig {
       saved.sprintCardScopes && typeof saved.sprintCardScopes === "object"
         ? saved.sprintCardScopes
         : DEFAULT_CONFIG.sprintCardScopes,
+    jiraVersionScopes: normalizeJiraVersionScopes(saved.jiraVersionScopes),
   };
 }
 
@@ -59,7 +101,11 @@ export function useConfig() {
         saved.myTeamAccounts === undefined ||
         saved.partnerTeamAccounts === undefined ||
         saved.repositoryGroups === undefined ||
-        saved.sprintCardScopes === undefined;
+        saved.sprintCardScopes === undefined ||
+        saved.jiraVersionScopes === undefined ||
+        saved.jiraProjectKey === undefined ||
+        saved.jiraEmail === undefined ||
+        saved.jiraAccessToken === undefined;
 
       if (needsMigration) {
         const migrated = migrateConfig(saved);

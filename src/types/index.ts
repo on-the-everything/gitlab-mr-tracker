@@ -52,9 +52,36 @@ export interface RepositoryGroup {
   repositories: string[];
 }
 
+export interface JiraVersionScope {
+  name: string;
+  version: string;
+  components: string[];
+}
+
+export interface JiraIssue {
+  key: string;
+  url: string;
+  summary: string;
+  status: string;
+  components: string[];
+  fixVersions: string[];
+  issueType: string;
+}
+
+export interface JiraVersion {
+  id: string;
+  name: string;
+  archived: boolean;
+  released: boolean;
+  releaseDate?: string;
+}
+
 export interface AppConfig {
   gitlabHost: string;
   jiraHost?: string;
+  jiraProjectKey: string;
+  jiraEmail: string;
+  jiraAccessToken: string;
   accessToken: string;
   autoRefreshInterval: number;
   myAccount: string;
@@ -66,6 +93,7 @@ export interface AppConfig {
   fetchClosedMRs: boolean;
   repositoryGroups: RepositoryGroup[];
   sprintCardScopes: Record<string, string>;
+  jiraVersionScopes: JiraVersionScope[];
 }
 
 export interface ParsedMRUrl {

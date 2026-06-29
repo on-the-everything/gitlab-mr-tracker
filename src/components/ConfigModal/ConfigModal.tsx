@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AppConfig, type RepositoryGroup } from '../../types';
+import { AppConfig, type JiraVersionScope, type RepositoryGroup } from '../../types';
 
 interface ConfigModalProps {
   isOpen: boolean;
@@ -32,6 +32,37 @@ function normalizeRepositoryGroups(repositoryGroups: unknown): RepositoryGroup[]
   });
 }
 
+function normalizeJiraVersionScopes(scopes: unknown): JiraVersionScope[] {
+  if (!Array.isArray(scopes)) {
+    return [{ name: 'AMZ 2.12', version: 'AMZ 2.12', components: [] }];
+  }
+
+  const normalized = scopes
+    .map((scope) => {
+      const scopeRecord =
+        scope && typeof scope === 'object'
+          ? (scope as Partial<JiraVersionScope>)
+          : {};
+      const components = Array.isArray(scopeRecord.components)
+        ? scopeRecord.components
+          .filter((component): component is string => typeof component === 'string')
+          .map((component) => component.trim())
+          .filter(Boolean)
+        : [];
+
+      return {
+        name: typeof scopeRecord.name === 'string' ? scopeRecord.name.trim() : '',
+        version: typeof scopeRecord.version === 'string' ? scopeRecord.version.trim() : '',
+        components,
+      };
+    })
+    .filter((scope) => scope.name && scope.version);
+
+  return normalized.length > 0
+    ? normalized
+    : [{ name: 'AMZ 2.12', version: 'AMZ 2.12', components: [] }];
+}
+
 function normalizeConfig(config: Partial<AppConfig>): AppConfig {
   const sprintCardScopes =
     config.sprintCardScopes && typeof config.sprintCardScopes === 'object'
@@ -58,6 +89,9 @@ function normalizeConfig(config: Partial<AppConfig>): AppConfig {
     fetchTimeValue: config.fetchTimeValue || 2,
     fetchClosedMRs: config.fetchClosedMRs !== undefined ? config.fetchClosedMRs : false,
     jiraHost: config.jiraHost || '',
+    jiraProjectKey: !config.jiraProjectKey || config.jiraProjectKey === 'AMZ' ? 'AZP' : config.jiraProjectKey,
+    jiraEmail: config.jiraEmail || '',
+    jiraAccessToken: config.jiraAccessToken || '',
     repositoryGroups: normalizeRepositoryGroups(config.repositoryGroups),
     sprintCardScopes: {
       sp13: '',
@@ -65,6 +99,7 @@ function normalizeConfig(config: Partial<AppConfig>): AppConfig {
       sp15: '',
       ...sprintCardScopes,
     },
+    jiraVersionScopes: normalizeJiraVersionScopes(config.jiraVersionScopes),
   };
 }
 
@@ -83,11 +118,29 @@ function formatRepositoryInput(repositories: string[]): string {
   return repositories.join('\n');
 }
 
+function parseComponentInput(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,]+/)
+        .map((component) => component.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function formatComponentInput(components: string[]): string {
+  return components.join('\n');
+}
+
 function sanitizeConfig(config: AppConfig): AppConfig {
   return {
     ...config,
     gitlabHost: config.gitlabHost.trim(),
     jiraHost: config.jiraHost?.trim() || '',
+    jiraProjectKey: config.jiraProjectKey.trim(),
+    jiraEmail: config.jiraEmail.trim(),
+    jiraAccessToken: config.jiraAccessToken.trim(),
     myAccount: config.myAccount.trim(),
     myTeamAccounts: config.myTeamAccounts.map((account) => account.trim()).filter(Boolean),
     partnerTeamAccounts: config.partnerTeamAccounts.map((account) => account.trim()).filter(Boolean),
@@ -100,6 +153,7 @@ function sanitizeConfig(config: AppConfig): AppConfig {
         .map(([sprint, cards]) => [sprint.trim().toLowerCase(), cards])
         .filter(([sprint]) => sprint),
     ),
+    jiraVersionScopes: normalizeJiraVersionScopes(config.jiraVersionScopes),
   };
 }
 
@@ -109,6 +163,7 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
   const [viewMode, setViewMode] = useState<'form' | 'json'>('form');
   const [jsonText, setJsonText] = useState<string>('');
   const [repositoryGroupTexts, setRepositoryGroupTexts] = useState<string[]>([]);
+  const [jiraComponentTexts, setJiraComponentTexts] = useState<string[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -118,6 +173,7 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
       setJsonText(JSON.stringify(normalizedConfig, null, 2));
       setViewMode('form');
       setRepositoryGroupTexts(normalizedConfig.repositoryGroups.map((g) => formatRepositoryInput(g.repositories)));
+      setJiraComponentTexts(normalizedConfig.jiraVersionScopes.map((scope) => formatComponentInput(scope.components)));
     }
   }, [isOpen, config]);
 
@@ -146,6 +202,22 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
       } catch {
         newErrors.jiraHost = 'Invalid URL format';
       }
+    }
+
+    if ((formData.jiraEmail.trim() || formData.jiraAccessToken.trim()) && !formData.jiraHost?.trim()) {
+      newErrors.jiraHost = 'Jira host is required when Jira API credentials are set';
+    }
+
+    if (formData.jiraHost?.trim() && !formData.jiraProjectKey.trim()) {
+      newErrors.jiraProjectKey = 'Jira project key is required for Jira version fetching';
+    }
+
+    if (formData.jiraHost?.trim() && formData.jiraAccessToken.trim() && !formData.jiraEmail.trim()) {
+      newErrors.jiraEmail = 'Jira email is required for Jira API access';
+    }
+
+    if (formData.jiraHost?.trim() && formData.jiraEmail.trim() && !formData.jiraAccessToken.trim()) {
+      newErrors.jiraAccessToken = 'Jira API token is required for Jira API access';
     }
 
     if (formData.autoRefreshInterval <= 0) {
@@ -178,6 +250,26 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
 
       if (repositories.length === 0) {
         newErrors[`repositoryGroupRepositories-${index}`] = 'Add at least one repository';
+      }
+    });
+
+    const jiraScopeNames = new Set<string>();
+    formData.jiraVersionScopes.forEach((scope, index) => {
+      const scopeName = scope.name.trim();
+      const version = scope.version.trim();
+
+      if (!scopeName) {
+        newErrors[`jiraVersionScopeName-${index}`] = 'Version scope name is required';
+      } else {
+        const normalizedScopeName = scopeName.toLowerCase();
+        if (jiraScopeNames.has(normalizedScopeName)) {
+          newErrors[`jiraVersionScopeName-${index}`] = 'Version scope name must be unique';
+        }
+        jiraScopeNames.add(normalizedScopeName);
+      }
+
+      if (!version) {
+        newErrors[`jiraVersionScopeVersion-${index}`] = 'Jira version is required';
       }
     });
 
@@ -234,7 +326,10 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
           }
 
           // Update form with imported config
-          setFormData(normalizeConfig(imported));
+          const normalizedImported = normalizeConfig(imported);
+          setFormData(normalizedImported);
+          setRepositoryGroupTexts(normalizedImported.repositoryGroups.map((g) => formatRepositoryInput(g.repositories)));
+          setJiraComponentTexts(normalizedImported.jiraVersionScopes.map((scope) => formatComponentInput(scope.components)));
 
           alert('Configuration imported successfully! Click Save to apply.');
         } catch (error) {
@@ -352,6 +447,180 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
               <p className="mt-1 text-xs text-gray-500">
                 Optional — used to build links to Jira tickets discovered in branch names.
               </p>
+            </div>
+
+            <div>
+              <label htmlFor="jiraEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                Jira Email
+              </label>
+              <input
+                type="email"
+                id="jiraEmail"
+                value={formData.jiraEmail}
+                onChange={(e) =>
+                  setFormData({ ...formData, jiraEmail: e.target.value })
+                }
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.jiraEmail ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                placeholder="name@company.com"
+              />
+              {errors.jiraEmail && (
+                <p className="mt-1 text-sm text-red-600">{errors.jiraEmail}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="jiraProjectKey" className="block text-sm font-medium text-gray-700 mb-1">
+                Jira Project Key
+              </label>
+              <input
+                type="text"
+                id="jiraProjectKey"
+                value={formData.jiraProjectKey}
+                onChange={(e) =>
+                  setFormData({ ...formData, jiraProjectKey: e.target.value })
+                }
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.jiraProjectKey ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                placeholder="AZP"
+              />
+              {errors.jiraProjectKey && (
+                <p className="mt-1 text-sm text-red-600">{errors.jiraProjectKey}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="jiraAccessToken" className="block text-sm font-medium text-gray-700 mb-1">
+                Jira API Token
+              </label>
+              <input
+                type="password"
+                id="jiraAccessToken"
+                value={formData.jiraAccessToken}
+                onChange={(e) =>
+                  setFormData({ ...formData, jiraAccessToken: e.target.value })
+                }
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.jiraAccessToken ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                placeholder="Enter your Jira API token"
+              />
+              {errors.jiraAccessToken && (
+                <p className="mt-1 text-sm text-red-600">{errors.jiraAccessToken}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                Used with Jira email for Jira Cloud API access.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Jira Version Scopes
+              </label>
+              <div className="space-y-3">
+                {formData.jiraVersionScopes.map((scope, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                    <div className="flex gap-2 items-start">
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Name
+                        </label>
+                        <input
+                          type="text"
+                          value={scope.name}
+                          onChange={(e) => {
+                            const nextScopes = [...formData.jiraVersionScopes];
+                            nextScopes[index] = { ...scope, name: e.target.value };
+                            setFormData({ ...formData, jiraVersionScopes: nextScopes });
+                          }}
+                          className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[`jiraVersionScopeName-${index}`] ? 'border-red-500' : 'border-gray-300'
+                            }`}
+                          placeholder="AMZ 2.12"
+                        />
+                        {errors[`jiraVersionScopeName-${index}`] && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {errors[`jiraVersionScopeName-${index}`]}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextScopes = formData.jiraVersionScopes.filter((_, i) => i !== index);
+                          setFormData({ ...formData, jiraVersionScopes: nextScopes });
+                          setJiraComponentTexts(jiraComponentTexts.filter((_, i) => i !== index));
+                        }}
+                        className="mt-6 px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Jira Version
+                      </label>
+                      <input
+                        type="text"
+                        value={scope.version}
+                        onChange={(e) => {
+                          const nextScopes = [...formData.jiraVersionScopes];
+                          nextScopes[index] = { ...scope, version: e.target.value };
+                          setFormData({ ...formData, jiraVersionScopes: nextScopes });
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[`jiraVersionScopeVersion-${index}`] ? 'border-red-500' : 'border-gray-300'
+                          }`}
+                        placeholder="AMZ 2.12"
+                      />
+                      {errors[`jiraVersionScopeVersion-${index}`] && (
+                        <p className="mt-1 text-sm text-red-600">
+                          {errors[`jiraVersionScopeVersion-${index}`]}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Components
+                      </label>
+                      <textarea
+                        value={jiraComponentTexts[index] ?? formatComponentInput(scope.components)}
+                        onChange={(e) => {
+                          const rawValue = e.target.value;
+                          const nextTexts = [...jiraComponentTexts];
+                          nextTexts[index] = rawValue;
+                          setJiraComponentTexts(nextTexts);
+                          const nextScopes = [...formData.jiraVersionScopes];
+                          nextScopes[index] = {
+                            ...scope,
+                            components: parseComponentInput(rawValue),
+                          };
+                          setFormData({ ...formData, jiraVersionScopes: nextScopes });
+                        }}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder={'checkout-service\npayment-service'}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Leave empty to include every component in this Jira version.
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      jiraVersionScopes: [
+                        ...formData.jiraVersionScopes,
+                        { name: '', version: '', components: [] },
+                      ],
+                    });
+                    setJiraComponentTexts([...jiraComponentTexts, '']);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                >
+                  + Add Jira Version Scope
+                </button>
+              </div>
             </div>
 
             <div>

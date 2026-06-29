@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MRTable } from '../../components/MRTable/MRTable';
 import { fetchRepositoryCompare } from '../../services/gitlabApi';
-import { AppConfig, MergeRequest, MRStatus, type RepositoryGroup } from '../../types';
+import { fetchJiraIssuesByVersion, fetchJiraProjectVersions } from '../../services/jiraApi';
+import { AppConfig, JiraIssue, JiraVersion, MergeRequest, MRStatus, type RepositoryGroup } from '../../types';
 import { buildJiraTicketUrl, extractJiraTickets } from '../../utils/jira';
 import { filterMRsByRepositoryGroups } from '../../utils/repositoryGroups';
 import { splitRepositoryPath } from '../../utils/repositoryFormatter';
 
 interface ReleaseChecklistPageProps {
   config: AppConfig;
-  onConfigChange: (config: AppConfig) => void;
   mrList: MergeRequest[];
   onMarkAsRead: (id: string) => void;
   onMarkAsUnread: (id: string) => void;
@@ -37,14 +37,12 @@ interface ReleaseExportItem {
 }
 
 interface CardDeployScope {
-  sprintName: string;
+  scopeName: string;
   cards: string[];
   relatedMRs: MergeRequest[];
   groups: ReleaseExportGroup[];
   unmatchedCards: string[];
 }
-
-const DEFAULT_SPRINTS = ['sp13', 'sp14', 'sp15'];
 
 function countByStatus(mrs: MergeRequest[]) {
   return {
@@ -59,10 +57,6 @@ function countByStatus(mrs: MergeRequest[]) {
 
 function getJiraTickets(mr: MergeRequest) {
   return extractJiraTickets(mr.sourceBranch, mr.title, mr.description);
-}
-
-function parseCardInput(input: string): string[] {
-  return extractJiraTickets(input);
 }
 
 function getShortFeatureName(mr: MergeRequest) {
@@ -126,30 +120,8 @@ function buildReleaseExportGroups(mrs: MergeRequest[]): ReleaseExportGroup[] {
     });
 }
 
-function normalizeSprintName(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, '');
-}
-
-function getConfiguredSprints(sprintCardScopes?: Record<string, string>) {
-  return Array.from(
-    new Set([
-      ...DEFAULT_SPRINTS,
-      ...Object.keys(sprintCardScopes || {}).map(normalizeSprintName).filter(Boolean),
-    ]),
-  ).sort((a, b) => {
-    const aNumber = Number(a.match(/\d+/)?.[0] || Number.MAX_SAFE_INTEGER);
-    const bNumber = Number(b.match(/\d+/)?.[0] || Number.MAX_SAFE_INTEGER);
-    if (aNumber !== bNumber) return aNumber - bNumber;
-    return a.localeCompare(b);
-  });
-}
-
-function formatSprintLabel(sprintName: string) {
-  return sprintName.toUpperCase();
-}
-
 function buildCardDeployScope(
-  sprintName: string,
+  scopeName: string,
   cards: string[],
   mrs: MergeRequest[],
 ): CardDeployScope {
@@ -166,7 +138,7 @@ function buildCardDeployScope(
   });
 
   return {
-    sprintName,
+    scopeName,
     cards,
     relatedMRs,
     groups: buildReleaseExportGroups(relatedMRs),
@@ -267,7 +239,7 @@ function formatCardDeployReport(
       : [];
 
   return [
-    `1. Cards that will be shown in ${formatSprintLabel(scope.sprintName)}`,
+    `1. Cards that will be shown in ${scope.scopeName}`,
     ...cardLines,
     ...unmatchedLines,
     '',
@@ -305,7 +277,6 @@ const readinessLabels: Record<ReadinessLevel, string> = {
 
 export function ReleaseChecklistPage({
   config,
-  onConfigChange,
   mrList,
   onMarkAsRead,
   onMarkAsUnread,
@@ -322,9 +293,13 @@ export function ReleaseChecklistPage({
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [exportVisible, setExportVisible] = useState(false);
-  const [selectedSprint, setSelectedSprint] = useState('sp13');
-  const [newSprintName, setNewSprintName] = useState('');
-  const [cardInput, setCardInput] = useState('');
+  const [selectedJiraVersion, setSelectedJiraVersion] = useState('AMZ 2.12');
+  const [jiraVersions, setJiraVersions] = useState<JiraVersion[]>([]);
+  const [loadingJiraVersions, setLoadingJiraVersions] = useState(false);
+  const [jiraVersionError, setJiraVersionError] = useState<string | null>(null);
+  const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([]);
+  const [loadingJiraIssues, setLoadingJiraIssues] = useState(false);
+  const [jiraError, setJiraError] = useState<string | null>(null);
 
   const scopedMRs = useMemo(() => {
     let next = [...mrList];
@@ -404,16 +379,36 @@ export function ReleaseChecklistPage({
     [deployScopeMRs],
   );
 
-  const configuredSprints = useMemo(
-    () => getConfiguredSprints(config.sprintCardScopes),
-    [config.sprintCardScopes],
+  const selectedJiraScope = useMemo(
+    () =>
+      config.jiraVersionScopes.find(
+        (scope) => scope.version === selectedJiraVersion || scope.name === selectedJiraVersion,
+      ),
+    [config.jiraVersionScopes, selectedJiraVersion],
   );
 
-  const sprintCards = useMemo(() => parseCardInput(cardInput), [cardInput]);
+  const selectedComponentFilters = useMemo(
+    () => selectedJiraScope?.components || [],
+    [selectedJiraScope],
+  );
+
+  const filteredJiraIssues = useMemo(() => {
+    const components = selectedComponentFilters.map((component) => component.toLowerCase());
+    if (components.length === 0) return jiraIssues;
+
+    return jiraIssues.filter((issue) =>
+      issue.components.some((component) => components.includes(component.toLowerCase())),
+    );
+  }, [jiraIssues, selectedComponentFilters]);
+
+  const jiraCards = useMemo(
+    () => filteredJiraIssues.map((issue) => issue.key),
+    [filteredJiraIssues],
+  );
 
   const cardDeployScope = useMemo(
-    () => buildCardDeployScope(selectedSprint, sprintCards, deployScopeMRs),
-    [selectedSprint, sprintCards, deployScopeMRs],
+    () => buildCardDeployScope(selectedJiraVersion || 'Jira Version', jiraCards, deployScopeMRs),
+    [selectedJiraVersion, jiraCards, deployScopeMRs],
   );
 
   const readinessLevel = getReadinessLevel(
@@ -457,45 +452,60 @@ export function ReleaseChecklistPage({
   }, [config.gitlabHost, config.accessToken, selectedRepository]);
 
   useEffect(() => {
-    if (!configuredSprints.includes(selectedSprint)) {
-      setSelectedSprint(configuredSprints[0] || 'sp13');
+    setJiraIssues([]);
+    setJiraError(null);
+  }, [selectedJiraVersion]);
+
+  const handleFetchJiraVersions = async () => {
+    setLoadingJiraVersions(true);
+    setJiraVersionError(null);
+
+    try {
+      const versions = await fetchJiraProjectVersions(config);
+      setJiraVersions(versions);
+      const preferredVersion =
+        versions.find((version) => version.name === selectedJiraVersion) ||
+        versions.find((version) => version.name === 'AMZ 2.12') ||
+        versions[0];
+      if (preferredVersion) {
+        setSelectedJiraVersion(preferredVersion.name);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch Jira versions';
+      const projectHint =
+        message.toLowerCase().includes('project') ||
+        message.toLowerCase().includes('not found') ||
+        message.includes('404');
+      setJiraVersionError(
+        projectHint
+          ? `${message}. Check Jira project key "${config.jiraProjectKey || '-'}".`
+          : message,
+      );
+    } finally {
+      setLoadingJiraVersions(false);
     }
-  }, [configuredSprints, selectedSprint]);
-
-  useEffect(() => {
-    setCardInput(config.sprintCardScopes?.[selectedSprint] || '');
-  }, [config.sprintCardScopes, selectedSprint]);
-
-  const handleCardInputChange = (value: string) => {
-    setCardInput(value);
-    onConfigChange({
-      ...config,
-      sprintCardScopes: {
-        ...(config.sprintCardScopes || {}),
-        [selectedSprint]: value,
-      },
-    });
   };
 
-  const handleAddSprint = () => {
-    const sprintName = normalizeSprintName(newSprintName);
-    if (!sprintName) return;
+  const handleFetchJiraCards = async () => {
+    if (!selectedJiraVersion) return;
 
-    onConfigChange({
-      ...config,
-      sprintCardScopes: {
-        ...(config.sprintCardScopes || {}),
-        [sprintName]: config.sprintCardScopes?.[sprintName] || '',
-      },
-    });
-    setSelectedSprint(sprintName);
-    setNewSprintName('');
+    setLoadingJiraIssues(true);
+    setJiraError(null);
+
+    try {
+      const issues = await fetchJiraIssuesByVersion(config, selectedJiraVersion);
+      setJiraIssues(issues);
+    } catch (err) {
+      setJiraError(err instanceof Error ? err.message : 'Failed to fetch Jira cards');
+    } finally {
+      setLoadingJiraIssues(false);
+    }
   };
 
   const scopeLabel =
     labelFilters && labelFilters.length > 0
       ? labelFilters.join(', ')
-      : 'No sprint or release label selected';
+      : 'No release label selected';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -511,7 +521,7 @@ export function ReleaseChecklistPage({
             <button
               type="button"
               onClick={() => setExportVisible(true)}
-              disabled={sprintCards.length === 0}
+              disabled={jiraCards.length === 0}
               className="inline-flex w-fit items-center rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               Export Result
@@ -540,14 +550,14 @@ export function ReleaseChecklistPage({
         <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Sprint Card Scope</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Jira Card Scope</h2>
               <div className="text-sm text-gray-500">
-                Saved in config per sprint. Paste Jira URLs, Jira keys, or comma-separated card lists to collect related MRs from the current Release Checklist scope.
+                Fetches Jira cards by version and filters by configured components.
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2 text-right text-sm">
               <div>
-                <div className="font-semibold text-gray-900">{sprintCards.length}</div>
+                <div className="font-semibold text-gray-900">{jiraCards.length}</div>
                 <div className="text-gray-500">Cards</div>
               </div>
               <div>
@@ -562,77 +572,137 @@ export function ReleaseChecklistPage({
           </div>
 
           <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <label htmlFor="release-sprint-select" className="block text-sm font-medium text-gray-700">
-                Sprint
-              </label>
-              <select
-                id="release-sprint-select"
-                value={selectedSprint}
-                onChange={(event) => setSelectedSprint(event.target.value)}
-                className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 lg:w-48"
-              >
-                {configuredSprints.map((sprint) => (
-                  <option key={sprint} value={sprint}>
-                    {formatSprintLabel(sprint)}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div>
+                <label htmlFor="release-jira-version-select" className="block text-sm font-medium text-gray-700">
+                  Jira Version
+                </label>
+                <select
+                  id="release-jira-version-select"
+                  value={selectedJiraVersion}
+                  onChange={(event) => setSelectedJiraVersion(event.target.value)}
+                  className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-56"
+                >
+                  {jiraVersions.length === 0 && (
+                    <option value="AMZ 2.12">AMZ 2.12</option>
+                  )}
+                  {jiraVersions.map((version) => (
+                    <option key={version.id} value={version.name}>
+                      {version.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="text-sm text-gray-600">
+                <div className="font-medium text-gray-800">Project</div>
+                <div>{config.jiraProjectKey || '-'}</div>
+              </div>
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div>
-                <label htmlFor="release-new-sprint" className="block text-sm font-medium text-gray-700">
-                  Add sprint
-                </label>
-                <input
-                  id="release-new-sprint"
-                  type="text"
-                  value={newSprintName}
-                  onChange={(event) => setNewSprintName(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      handleAddSprint();
-                    }
-                  }}
-                  placeholder="sp16"
-                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-36"
-                />
-              </div>
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={handleAddSprint}
-                disabled={!normalizeSprintName(newSprintName)}
-                className="rounded bg-gray-900 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+                onClick={handleFetchJiraVersions}
+                disabled={
+                  loadingJiraVersions ||
+                  !config.jiraHost ||
+                  !config.jiraProjectKey ||
+                  !config.jiraEmail ||
+                  !config.jiraAccessToken
+                }
+                className="inline-flex w-fit items-center rounded bg-gray-900 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
               >
-                Add
+                {loadingJiraVersions ? 'Fetching versions...' : 'Fetch Versions'}
+              </button>
+              <button
+                type="button"
+                onClick={handleFetchJiraCards}
+                disabled={
+                  loadingJiraIssues ||
+                  jiraVersions.length === 0 ||
+                  !selectedJiraVersion ||
+                  !config.jiraHost ||
+                  !config.jiraEmail ||
+                  !config.jiraAccessToken
+                }
+                className="inline-flex w-fit items-center rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                {loadingJiraIssues ? 'Fetching cards...' : 'Fetch Jira Cards'}
               </button>
             </div>
           </div>
 
-          <textarea
-            value={cardInput}
-            onChange={(event) => handleCardInputChange(event.target.value)}
-            placeholder={`https://ascend-commerce.atlassian.net/browse/AZP-20354
-https://ascend-commerce.atlassian.net/browse/AZP-20353
-AZP-20322, AZP-20321`}
-            className="mt-4 min-h-[120px] w-full resize-y rounded border border-gray-300 p-3 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            spellCheck={false}
-          />
+          <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3">
+            <div className="text-sm font-semibold text-gray-900">Component filter</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {selectedComponentFilters.length ? (
+                selectedComponentFilters.map((component) => (
+                  <span key={component} className="rounded bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                    {component}
+                  </span>
+                ))
+              ) : (
+                <span className="text-sm text-gray-500">All components</span>
+              )}
+            </div>
+          </div>
 
-          {sprintCards.length > 0 && (
+          {jiraVersionError && (
+            <div className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {jiraVersionError}
+            </div>
+          )}
+
+          {jiraError && (
+            <div className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {jiraError}
+            </div>
+          )}
+
+          {!config.jiraHost || !config.jiraEmail || !config.jiraAccessToken ? (
+            <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+              Configure Jira host, email, and API token before fetching Jira cards.
+            </div>
+          ) : null}
+
+          {config.jiraHost && !config.jiraProjectKey ? (
+            <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+              Configure Jira project key before fetching Jira versions.
+            </div>
+          ) : null}
+
+          {config.jiraHost && config.jiraProjectKey && jiraVersions.length === 0 && !loadingJiraVersions ? (
+            <div className="mt-3 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+              Fetch Jira versions first, then fetch cards for the selected version.
+            </div>
+          ) : null}
+
+          {jiraIssues.length > 0 && (
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
               <div className="rounded border border-gray-200 bg-gray-50 p-3">
                 <div className="text-sm font-semibold text-gray-900">
-                  Cards that will be shown in {formatSprintLabel(selectedSprint)}
+                  Cards that will be shown in {selectedJiraVersion}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {sprintCards.map((card) => (
-                    <span key={card} className="rounded bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                      {card}
-                    </span>
-                  ))}
+                <div className="mt-2 space-y-2">
+                  {filteredJiraIssues.length === 0 ? (
+                    <div className="text-sm text-gray-500">No cards match the configured component filter.</div>
+                  ) : (
+                    filteredJiraIssues.map((issue) => (
+                      <a
+                        key={issue.key}
+                        href={issue.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block rounded bg-white px-3 py-2 text-sm text-gray-800 ring-1 ring-gray-200 hover:text-blue-700"
+                      >
+                        <div className="font-semibold">{issue.key}: {issue.summary}</div>
+                        <div className="mt-1 text-xs text-gray-500">
+                          {issue.status} · {issue.components.length > 0 ? issue.components.join(', ') : 'No component'}
+                        </div>
+                      </a>
+                    ))
+                  )}
                 </div>
               </div>
               <div className="rounded border border-gray-200 bg-gray-50 p-3">
@@ -660,9 +730,9 @@ AZP-20322, AZP-20321`}
           )}
         </div>
 
-        {sprintCards.length > 0 && (
+        {jiraCards.length > 0 && (
           <MRTable
-            title={`All related MRs from sprint cards (${cardDeployScope.relatedMRs.length})`}
+            title={`All related MRs from Jira cards (${cardDeployScope.relatedMRs.length})`}
             mrList={cardDeployScope.relatedMRs}
             onMarkAsRead={onMarkAsRead}
             onMarkAsUnread={onMarkAsUnread}
@@ -688,8 +758,8 @@ AZP-20322, AZP-20321`}
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <CheckRow
               passed={summary.total > 0}
-              title="Sprint scope has MRs"
-              detail={summary.total > 0 ? `${summary.total} MRs in scope` : 'Add a sprint/release label filter or adjust repository filters'}
+              title="Release scope has MRs"
+              detail={summary.total > 0 ? `${summary.total} MRs in scope` : 'Add a release label filter or adjust repository filters'}
             />
             <CheckRow
               passed={notMergedMRs.length === 0}
@@ -742,7 +812,6 @@ AZP-20322, AZP-20321`}
             </div>
           )}
         </div>
-
         <MRTable
           title={`Blockers: not merged (${notMergedMRs.length})`}
           mrList={notMergedMRs}
@@ -776,7 +845,7 @@ AZP-20322, AZP-20321`}
         {deployScopeMRs.length === 0 && (
           <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow-sm border border-gray-200">
             <p className="text-lg">No merge requests in the release checklist scope.</p>
-            <p className="text-sm mt-2">Use a sprint/release label filter or adjust repository filters.</p>
+            <p className="text-sm mt-2">Use a release label filter or adjust repository filters.</p>
           </div>
         )}
       </div>

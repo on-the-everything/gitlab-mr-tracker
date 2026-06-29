@@ -36,7 +36,15 @@ bun install
 bun run dev
 ```
 
-3. Open your browser and navigate to the URL shown in the terminal (usually `http://localhost:5173`)
+3. Open your browser and navigate to the URL shown in the terminal (usually `http://localhost:5173`). If Vite reports a different port because `5173` is already in use, use that active URL instead, for example `http://localhost:5174/release-checklist`.
+
+### Jira API Proxy
+
+Jira card and version fetches call same-origin routes under `/api/jira/*`. Do not point the browser directly at Jira Cloud APIs; Jira Cloud blocks those cross-origin requests.
+
+Local development uses the Vite middleware in `vite.config.ts` for `/api/jira/search` and `/api/jira/project-versions`. Cloudflare Pages deployments use the Functions in `functions/api/jira/`.
+
+This works on Cloudflare Pages because Pages Functions are deployed with the static build. A static-only host must provide an equivalent proxy route for `/api/jira/*`; otherwise Jira version fetching will return `404`.
 
 ### Building for Production
 
@@ -118,4 +126,3 @@ Requires ES6+ and LocalStorage support.
 ## License
 
 MIT
-
