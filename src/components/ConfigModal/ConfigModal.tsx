@@ -198,7 +198,7 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
 
   const handleExport = () => {
     try {
-      const configJson = JSON.stringify(config, null, 2);
+      const configJson = JSON.stringify(sanitizeConfig(formData), null, 2);
       const blob = new Blob([configJson], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -274,7 +274,10 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('json')}
+              onClick={() => {
+                setJsonText(JSON.stringify(sanitizeConfig(formData), null, 2));
+                setViewMode('json');
+              }}
               className={`px-4 py-2 font-medium text-sm ${viewMode === 'json'
                 ? 'border-b-2 border-blue-500 text-blue-600'
                 : 'text-gray-500 hover:text-gray-700'

@@ -474,6 +474,8 @@ function App() {
             path="/release-checklist"
             element={(
               <ReleaseChecklistPage
+                config={config}
+                onConfigChange={saveConfig}
                 mrList={mrList}
                 onMarkAsRead={markMRAsRead}
                 onMarkAsUnread={markMRAsUnread}

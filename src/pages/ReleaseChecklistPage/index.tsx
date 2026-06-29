@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MRTable } from '../../components/MRTable/MRTable';
-import { useConfig } from '../../hooks/useConfig';
 import { fetchRepositoryCompare } from '../../services/gitlabApi';
-import { MergeRequest, MRStatus, type RepositoryGroup } from '../../types';
+import { AppConfig, MergeRequest, MRStatus, type RepositoryGroup } from '../../types';
 import { buildJiraTicketUrl, extractJiraTickets } from '../../utils/jira';
 import { filterMRsByRepositoryGroups } from '../../utils/repositoryGroups';
 import { splitRepositoryPath } from '../../utils/repositoryFormatter';
 
 interface ReleaseChecklistPageProps {
+  config: AppConfig;
+  onConfigChange: (config: AppConfig) => void;
   mrList: MergeRequest[];
   onMarkAsRead: (id: string) => void;
   onMarkAsUnread: (id: string) => void;
@@ -303,6 +304,8 @@ const readinessLabels: Record<ReadinessLevel, string> = {
 };
 
 export function ReleaseChecklistPage({
+  config,
+  onConfigChange,
   mrList,
   onMarkAsRead,
   onMarkAsUnread,
@@ -315,11 +318,12 @@ export function ReleaseChecklistPage({
   selectedRepositoryGroups,
   teamScopeFilters,
 }: ReleaseChecklistPageProps) {
-  const { config } = useConfig();
   const [compareDiffs, setCompareDiffs] = useState<any[]>([]);
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [exportVisible, setExportVisible] = useState(false);
+  const [selectedSprint, setSelectedSprint] = useState('sp13');
+  const [newSprintName, setNewSprintName] = useState('');
   const [cardInput, setCardInput] = useState('');
 
   const scopedMRs = useMemo(() => {
@@ -400,11 +404,16 @@ export function ReleaseChecklistPage({
     [deployScopeMRs],
   );
 
+  const configuredSprints = useMemo(
+    () => getConfiguredSprints(config.sprintCardScopes),
+    [config.sprintCardScopes],
+  );
+
   const sprintCards = useMemo(() => parseCardInput(cardInput), [cardInput]);
 
   const cardDeployScope = useMemo(
-    () => buildCardDeployScope(sprintCards, deployScopeMRs),
-    [sprintCards, deployScopeMRs],
+    () => buildCardDeployScope(selectedSprint, sprintCards, deployScopeMRs),
+    [selectedSprint, sprintCards, deployScopeMRs],
   );
 
   const readinessLevel = getReadinessLevel(
@@ -445,7 +454,43 @@ export function ReleaseChecklistPage({
     return () => {
       mounted = false;
     };
-  }, [config, selectedRepository]);
+  }, [config.gitlabHost, config.accessToken, selectedRepository]);
+
+  useEffect(() => {
+    if (!configuredSprints.includes(selectedSprint)) {
+      setSelectedSprint(configuredSprints[0] || 'sp13');
+    }
+  }, [configuredSprints, selectedSprint]);
+
+  useEffect(() => {
+    setCardInput(config.sprintCardScopes?.[selectedSprint] || '');
+  }, [config.sprintCardScopes, selectedSprint]);
+
+  const handleCardInputChange = (value: string) => {
+    setCardInput(value);
+    onConfigChange({
+      ...config,
+      sprintCardScopes: {
+        ...(config.sprintCardScopes || {}),
+        [selectedSprint]: value,
+      },
+    });
+  };
+
+  const handleAddSprint = () => {
+    const sprintName = normalizeSprintName(newSprintName);
+    if (!sprintName) return;
+
+    onConfigChange({
+      ...config,
+      sprintCardScopes: {
+        ...(config.sprintCardScopes || {}),
+        [sprintName]: config.sprintCardScopes?.[sprintName] || '',
+      },
+    });
+    setSelectedSprint(sprintName);
+    setNewSprintName('');
+  };
 
   const scopeLabel =
     labelFilters && labelFilters.length > 0
@@ -497,7 +542,7 @@ export function ReleaseChecklistPage({
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Sprint Card Scope</h2>
               <div className="text-sm text-gray-500">
-                Paste Jira URLs, Jira keys, or comma-separated card lists to collect related MRs from the current Release Checklist scope.
+                Saved in config per sprint. Paste Jira URLs, Jira keys, or comma-separated card lists to collect related MRs from the current Release Checklist scope.
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2 text-right text-sm">
@@ -516,9 +561,59 @@ export function ReleaseChecklistPage({
             </div>
           </div>
 
+          <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <label htmlFor="release-sprint-select" className="block text-sm font-medium text-gray-700">
+                Sprint
+              </label>
+              <select
+                id="release-sprint-select"
+                value={selectedSprint}
+                onChange={(event) => setSelectedSprint(event.target.value)}
+                className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 lg:w-48"
+              >
+                {configuredSprints.map((sprint) => (
+                  <option key={sprint} value={sprint}>
+                    {formatSprintLabel(sprint)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div>
+                <label htmlFor="release-new-sprint" className="block text-sm font-medium text-gray-700">
+                  Add sprint
+                </label>
+                <input
+                  id="release-new-sprint"
+                  type="text"
+                  value={newSprintName}
+                  onChange={(event) => setNewSprintName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleAddSprint();
+                    }
+                  }}
+                  placeholder="sp16"
+                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-36"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleAddSprint}
+                disabled={!normalizeSprintName(newSprintName)}
+                className="rounded bg-gray-900 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
           <textarea
             value={cardInput}
-            onChange={(event) => setCardInput(event.target.value)}
+            onChange={(event) => handleCardInputChange(event.target.value)}
             placeholder={`https://ascend-commerce.atlassian.net/browse/AZP-20354
 https://ascend-commerce.atlassian.net/browse/AZP-20353
 AZP-20322, AZP-20321`}
@@ -529,7 +624,9 @@ AZP-20322, AZP-20321`}
           {sprintCards.length > 0 && (
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
               <div className="rounded border border-gray-200 bg-gray-50 p-3">
-                <div className="text-sm font-semibold text-gray-900">Cards that will be shown in each SP</div>
+                <div className="text-sm font-semibold text-gray-900">
+                  Cards that will be shown in {formatSprintLabel(selectedSprint)}
+                </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {sprintCards.map((card) => (
                     <span key={card} className="rounded bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
