@@ -320,6 +320,7 @@ export function ReleaseChecklistPage({
   const [loadingJiraIssues, setLoadingJiraIssues] = useState(false);
   const [jiraError, setJiraError] = useState<string | null>(null);
   const autoFetchKeyRef = useRef('');
+  const restoredComponentFilterKeyRef = useRef('');
 
   const scopedMRs = useMemo(() => {
     let next = [...mrList];
@@ -428,6 +429,7 @@ export function ReleaseChecklistPage({
       a.localeCompare(b, undefined, { sensitivity: 'base' }),
     );
   }, [jiraIssues]);
+  const availableJiraComponentKey = availableJiraComponents.join('\n');
 
   const filteredJiraIssues = useMemo(() => {
     const components = selectedComponentFilters.map((component) => component.toLowerCase());
@@ -499,13 +501,48 @@ export function ReleaseChecklistPage({
     setJiraIssues([]);
     setJiraError(null);
     setSelectedComponentFilters([]);
+    restoredComponentFilterKeyRef.current = '';
   }, [selectedJiraVersion]);
 
   useEffect(() => {
+    if (!selectedJiraVersion || availableJiraComponents.length === 0) {
+      return;
+    }
+
+    const filterKey = `${config.jiraProjectKey || ''}::${selectedJiraVersion}`;
+    if (restoredComponentFilterKeyRef.current !== filterKey) {
+      const savedFilters = storage.getSelectedJiraComponentFilters(
+        config.jiraProjectKey || '',
+        selectedJiraVersion,
+      );
+      setSelectedComponentFilters(
+        savedFilters.filter((component) => availableJiraComponents.includes(component)),
+      );
+      restoredComponentFilterKeyRef.current = filterKey;
+      return;
+    }
+
     setSelectedComponentFilters((currentFilters) =>
       currentFilters.filter((component) => availableJiraComponents.includes(component)),
     );
-  }, [availableJiraComponents]);
+  }, [availableJiraComponentKey, config.jiraProjectKey, selectedJiraVersion]);
+
+  useEffect(() => {
+    if (!selectedJiraVersion || availableJiraComponents.length === 0) {
+      return;
+    }
+
+    storage.saveSelectedJiraComponentFilters(
+      config.jiraProjectKey || '',
+      selectedJiraVersion,
+      selectedComponentFilters,
+    );
+  }, [
+    availableJiraComponents.length,
+    config.jiraProjectKey,
+    selectedComponentFilters,
+    selectedJiraVersion,
+  ]);
 
   useEffect(() => {
     setSelectedJiraVersion(storage.getSelectedJiraVersion(config.jiraProjectKey || ''));

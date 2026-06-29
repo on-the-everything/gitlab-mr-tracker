@@ -8,8 +8,13 @@ const LABEL_FILTERS_KEY = 'gitlab_mr_label_filters';
 const SELECTED_REPOSITORY_KEY = 'gitlab_mr_selected_repository';
 const SELECTED_REPOSITORY_GROUPS_KEY = 'gitlab_mr_selected_repository_groups';
 const SELECTED_JIRA_VERSIONS_KEY = 'gitlab_mr_selected_jira_versions';
+const SELECTED_JIRA_COMPONENT_FILTERS_KEY = 'gitlab_mr_selected_jira_component_filters';
 const TEAM_SCOPE_FILTERS_KEY = 'gitlab_mr_team_scope_filters';
 const MR_READ_TIMESTAMPS_KEY = 'gitlab_mr_read_timestamps';
+
+function getJiraVersionStorageKey(projectKey: string, version: string): string {
+  return `${projectKey.trim().toUpperCase()}::${version.trim()}`;
+}
 
 export const storage = {
   getConfig(): AppConfig | null {
@@ -179,6 +184,46 @@ export const storage = {
       localStorage.setItem(SELECTED_JIRA_VERSIONS_KEY, JSON.stringify(versions));
     } catch (error) {
       console.error('Failed to save selected Jira version:', error);
+    }
+  },
+
+  getSelectedJiraComponentFilters(projectKey: string, version: string): string[] {
+    try {
+      const storageKey = getJiraVersionStorageKey(projectKey, version);
+      if (storageKey === '::') return [];
+
+      const item = localStorage.getItem(SELECTED_JIRA_COMPONENT_FILTERS_KEY);
+      if (!item) return [];
+
+      const filters = JSON.parse(item) as Record<string, string[]>;
+      return Array.isArray(filters[storageKey])
+        ? filters[storageKey].filter((component): component is string => typeof component === 'string')
+        : [];
+    } catch {
+      return [];
+    }
+  },
+
+  saveSelectedJiraComponentFilters(projectKey: string, version: string, components: string[]): void {
+    try {
+      const storageKey = getJiraVersionStorageKey(projectKey, version);
+      if (storageKey === '::') return;
+
+      const normalizedComponents = components
+        .map((component) => component.trim())
+        .filter(Boolean);
+      const item = localStorage.getItem(SELECTED_JIRA_COMPONENT_FILTERS_KEY);
+      const filters = item ? (JSON.parse(item) as Record<string, string[]>) : {};
+
+      if (normalizedComponents.length > 0) {
+        filters[storageKey] = normalizedComponents;
+      } else {
+        delete filters[storageKey];
+      }
+
+      localStorage.setItem(SELECTED_JIRA_COMPONENT_FILTERS_KEY, JSON.stringify(filters));
+    } catch (error) {
+      console.error('Failed to save selected Jira component filters:', error);
     }
   },
 
