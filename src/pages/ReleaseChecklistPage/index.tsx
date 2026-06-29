@@ -32,6 +32,14 @@ interface ReleaseExportGroup {
 interface ReleaseExportItem {
   jiraTickets: string[];
   featureName: string;
+  mr: MergeRequest;
+}
+
+interface CardDeployScope {
+  cards: string[];
+  relatedMRs: MergeRequest[];
+  groups: ReleaseExportGroup[];
+  unmatchedCards: string[];
 }
 
 function countByStatus(mrs: MergeRequest[]) {
@@ -47,6 +55,10 @@ function countByStatus(mrs: MergeRequest[]) {
 
 function getJiraTickets(mr: MergeRequest) {
   return extractJiraTickets(mr.sourceBranch, mr.title, mr.description);
+}
+
+function parseCardInput(input: string): string[] {
+  return extractJiraTickets(input);
 }
 
 function getShortFeatureName(mr: MergeRequest) {
@@ -85,6 +97,7 @@ function buildReleaseExportGroups(mrs: MergeRequest[]): ReleaseExportGroup[] {
     const item = {
       jiraTickets: getJiraTickets(mr),
       featureName: getShortFeatureName(mr),
+      mr,
     };
 
     if (!groups.has(repository)) {
@@ -109,25 +122,132 @@ function buildReleaseExportGroups(mrs: MergeRequest[]): ReleaseExportGroup[] {
     });
 }
 
-function formatReleaseExportGroup(
-  group: ReleaseExportGroup,
-  options: { jiraHost?: string; useFullJiraUrl: boolean },
-) {
-  const lines = group.items.map((item) => {
-    const ticketText =
-      item.jiraTickets.length > 0
-        ? item.jiraTickets
-            .map((ticket) => {
-              if (!options.useFullJiraUrl) return ticket;
-              return buildJiraTicketUrl(ticket, options.jiraHost) || ticket;
-            })
-            .join(', ')
-        : 'No Jira';
+function buildCardDeployScope(cards: string[], mrs: MergeRequest[]): CardDeployScope {
+  const cardSet = new Set(cards);
+  const relatedMRs = mrs.filter((mr) =>
+    getJiraTickets(mr).some((ticket) => cardSet.has(ticket)),
+  );
+  const matchedCards = new Set<string>();
 
-    return `- ${ticketText}: ${item.featureName}`;
+  relatedMRs.forEach((mr) => {
+    getJiraTickets(mr).forEach((ticket) => {
+      if (cardSet.has(ticket)) matchedCards.add(ticket);
+    });
   });
 
-  return `# ${group.displayName}\n${lines.join('\n')}`;
+  return {
+    cards,
+    relatedMRs,
+    groups: buildReleaseExportGroups(relatedMRs),
+    unmatchedCards: cards.filter((card) => !matchedCards.has(card)),
+  };
+}
+
+function formatTicketList(
+  tickets: string[],
+  options: { jiraHost?: string; useFullJiraUrl: boolean },
+) {
+  if (tickets.length === 0) return 'No Jira';
+
+  return tickets
+    .map((ticket) => {
+      if (!options.useFullJiraUrl) return ticket;
+      return buildJiraTicketUrl(ticket, options.jiraHost) || ticket;
+    })
+    .join(', ');
+}
+
+function formatMRLine(
+  mr: MergeRequest,
+  options: { jiraHost?: string; useFullJiraUrl: boolean },
+) {
+  const tickets = getJiraTickets(mr).filter((ticket, index, all) => all.indexOf(ticket) === index);
+  const ticketText = formatTicketList(tickets, options);
+  return `- ${ticketText}: ${mr.repository} !${mr.iid} [${mr.status}] ${getShortFeatureName(mr)} (${mr.url})`;
+}
+
+function getDeployScopeLine(group: ReleaseExportGroup) {
+  const total = group.items.length;
+  const statusCounts = countByStatus(group.items.map((item) => item.mr));
+  const openCount = statusCounts.total - statusCounts.merged;
+
+  if (openCount > 0) {
+    return `${total} MRs, ${openCount} not merged yet`;
+  }
+
+  return `${total} merged MR${total === 1 ? '' : 's'}, ready to deploy`;
+}
+
+function formatCardDeployReport(
+  scope: CardDeployScope,
+  options: { jiraHost?: string; useFullJiraUrl: boolean },
+) {
+  const cardLines =
+    scope.cards.length > 0
+      ? scope.cards.map((card) => {
+          const cardText = options.useFullJiraUrl
+            ? buildJiraTicketUrl(card, options.jiraHost) || card
+            : card;
+          return `- ${cardText}`;
+        })
+      : ['- No cards provided'];
+
+  const relatedMRLines =
+    scope.relatedMRs.length > 0
+      ? scope.relatedMRs.map((mr) => formatMRLine(mr, options))
+      : ['- No related MRs found in the current Release Checklist scope'];
+
+  const groupedMRLines =
+    scope.groups.length > 0
+      ? scope.groups.flatMap((group) => [
+          `# ${group.displayName}`,
+          ...group.items.map((item) => {
+            const ticketText = formatTicketList(item.jiraTickets, options);
+            return `- ${ticketText}: !${item.mr.iid} [${item.mr.status}] ${item.featureName}`;
+          }),
+          '',
+        ])
+      : ['- No deploy service groups found', ''];
+
+  const deployScopeLines =
+    scope.groups.length > 0
+      ? scope.groups.flatMap((group) => {
+          const cards = Array.from(
+            new Set(group.items.flatMap((item) => item.jiraTickets)),
+          ).filter((ticket) => scope.cards.includes(ticket));
+
+          return [
+            `# ${group.displayName}`,
+            `- Service: ${group.repository}`,
+            `- Cards: ${formatTicketList(cards, options)}`,
+            `- Scope: ${getDeployScopeLine(group)}`,
+            '',
+          ];
+        })
+      : ['- No deploy scope available', ''];
+
+  const unmatchedLines =
+    scope.unmatchedCards.length > 0
+      ? [
+          '',
+          'Unmatched Cards',
+          ...scope.unmatchedCards.map((card) => `- ${card}`),
+        ]
+      : [];
+
+  return [
+    '1. Cards that will be shown in each SP',
+    ...cardLines,
+    ...unmatchedLines,
+    '',
+    '2. All related MRs',
+    ...relatedMRLines,
+    '',
+    '3. MRs grouped by deploy Service',
+    ...groupedMRLines,
+    '4. Clear deploy scope for each Service',
+    ...deployScopeLines,
+  ].join('\n');
 }
 
 function getReadinessLevel(
@@ -170,6 +290,7 @@ export function ReleaseChecklistPage({
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [exportVisible, setExportVisible] = useState(false);
+  const [cardInput, setCardInput] = useState('');
 
   const scopedMRs = useMemo(() => {
     let next = [...mrList];
@@ -224,39 +345,41 @@ export function ReleaseChecklistPage({
     selectedRepositoryGroups,
   ]);
 
-  const summary = useMemo(() => countByStatus(scopedMRs), [scopedMRs]);
+  const deployScopeMRs = useMemo(
+    () => scopedMRs.filter((mr) => mr.status !== MRStatus.REJECTED),
+    [scopedMRs],
+  );
+
+  const summary = useMemo(() => countByStatus(deployScopeMRs), [deployScopeMRs]);
 
   const notMergedMRs = useMemo(
     () =>
-      scopedMRs.filter(
-        (mr) => mr.status !== MRStatus.MERGED && mr.status !== MRStatus.REJECTED,
+      deployScopeMRs.filter(
+        (mr) => mr.status !== MRStatus.MERGED,
       ),
-    [scopedMRs],
-  );
-
-  const rejectedMRs = useMemo(
-    () => scopedMRs.filter((mr) => mr.status === MRStatus.REJECTED),
-    [scopedMRs],
+    [deployScopeMRs],
   );
 
   const missingJiraMRs = useMemo(
-    () => scopedMRs.filter((mr) => getJiraTickets(mr).length === 0),
-    [scopedMRs],
+    () => deployScopeMRs.filter((mr) => getJiraTickets(mr).length === 0),
+    [deployScopeMRs],
   );
 
   const mergedMRs = useMemo(
-    () => scopedMRs.filter((mr) => mr.status === MRStatus.MERGED),
-    [scopedMRs],
+    () => deployScopeMRs.filter((mr) => mr.status === MRStatus.MERGED),
+    [deployScopeMRs],
   );
 
-  const releaseExportGroups = useMemo(
-    () => buildReleaseExportGroups(scopedMRs),
-    [scopedMRs],
+  const sprintCards = useMemo(() => parseCardInput(cardInput), [cardInput]);
+
+  const cardDeployScope = useMemo(
+    () => buildCardDeployScope(sprintCards, deployScopeMRs),
+    [sprintCards, deployScopeMRs],
   );
 
   const readinessLevel = getReadinessLevel(
     summary.total,
-    rejectedMRs.length + notMergedMRs.length,
+    notMergedMRs.length,
     missingJiraMRs.length,
   );
 
@@ -313,7 +436,7 @@ export function ReleaseChecklistPage({
             <button
               type="button"
               onClick={() => setExportVisible(true)}
-              disabled={scopedMRs.length === 0}
+              disabled={sprintCards.length === 0}
               className="inline-flex w-fit items-center rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               Export Result
@@ -327,18 +450,100 @@ export function ReleaseChecklistPage({
         <ReleaseChecklistExportDialog
           visible={exportVisible}
           onClose={() => setExportVisible(false)}
-          groups={releaseExportGroups}
+          scope={cardDeployScope}
           jiraHost={config.jiraHost}
         />
 
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <SummaryTile label="Total" value={summary.total} />
           <SummaryTile label="Merged" value={summary.merged} tone="green" />
           <SummaryTile label="Not merged" value={notMergedMRs.length} tone={notMergedMRs.length > 0 ? 'yellow' : 'gray'} />
-          <SummaryTile label="Rejected" value={summary.rejected} tone={summary.rejected > 0 ? 'red' : 'gray'} />
           <SummaryTile label="Missing Jira" value={missingJiraMRs.length} tone={missingJiraMRs.length > 0 ? 'yellow' : 'gray'} />
           <SummaryTile label="Branch diffs" value={selectedRepository ? compareDiffs.length : '-'} />
         </div>
+
+        <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Sprint Card Scope</h2>
+              <div className="text-sm text-gray-500">
+                Paste Jira URLs, Jira keys, or comma-separated card lists to collect related MRs from the current Release Checklist scope.
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-right text-sm">
+              <div>
+                <div className="font-semibold text-gray-900">{sprintCards.length}</div>
+                <div className="text-gray-500">Cards</div>
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900">{cardDeployScope.relatedMRs.length}</div>
+                <div className="text-gray-500">MRs</div>
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900">{cardDeployScope.groups.length}</div>
+                <div className="text-gray-500">Services</div>
+              </div>
+            </div>
+          </div>
+
+          <textarea
+            value={cardInput}
+            onChange={(event) => setCardInput(event.target.value)}
+            placeholder={`https://ascend-commerce.atlassian.net/browse/AZP-20354
+https://ascend-commerce.atlassian.net/browse/AZP-20353
+AZP-20322, AZP-20321`}
+            className="mt-4 min-h-[120px] w-full resize-y rounded border border-gray-300 p-3 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            spellCheck={false}
+          />
+
+          {sprintCards.length > 0 && (
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              <div className="rounded border border-gray-200 bg-gray-50 p-3">
+                <div className="text-sm font-semibold text-gray-900">Cards that will be shown in each SP</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {sprintCards.map((card) => (
+                    <span key={card} className="rounded bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                      {card}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded border border-gray-200 bg-gray-50 p-3">
+                <div className="text-sm font-semibold text-gray-900">Deploy services</div>
+                <div className="mt-2 space-y-1 text-sm text-gray-700">
+                  {cardDeployScope.groups.length === 0 ? (
+                    <div>No services found for these cards in the current scope.</div>
+                  ) : (
+                    cardDeployScope.groups.map((group) => (
+                      <div key={group.repository} className="flex items-center justify-between gap-3">
+                        <span>{group.displayName}</span>
+                        <span className="text-gray-500">{getDeployScopeLine(group)}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {cardDeployScope.unmatchedCards.length > 0 && (
+            <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+              No related MR found for: {cardDeployScope.unmatchedCards.join(', ')}
+            </div>
+          )}
+        </div>
+
+        {sprintCards.length > 0 && (
+          <MRTable
+            title={`All related MRs from sprint cards (${cardDeployScope.relatedMRs.length})`}
+            mrList={cardDeployScope.relatedMRs}
+            onMarkAsRead={onMarkAsRead}
+            onMarkAsUnread={onMarkAsUnread}
+            hasNewComments={hasNewComments}
+            isRead={isRead}
+            onLabelClick={onLabelClick}
+          />
+        )}
 
         <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -363,11 +568,6 @@ export function ReleaseChecklistPage({
               passed={notMergedMRs.length === 0}
               title="All scoped MRs are merged"
               detail={notMergedMRs.length === 0 ? 'No open MRs in scope' : `${notMergedMRs.length} MRs still need merge`}
-            />
-            <CheckRow
-              passed={rejectedMRs.length === 0}
-              title="No rejected MRs in scope"
-              detail={rejectedMRs.length === 0 ? 'No rejected MRs found' : `${rejectedMRs.length} rejected MRs need review`}
             />
             <CheckRow
               passed={missingJiraMRs.length === 0}
@@ -427,16 +627,6 @@ export function ReleaseChecklistPage({
         />
 
         <MRTable
-          title={`Blockers: rejected (${rejectedMRs.length})`}
-          mrList={rejectedMRs}
-          onMarkAsRead={onMarkAsRead}
-          onMarkAsUnread={onMarkAsUnread}
-          hasNewComments={hasNewComments}
-          isRead={isRead}
-          onLabelClick={onLabelClick}
-        />
-
-        <MRTable
           title={`Needs Jira key (${missingJiraMRs.length})`}
           mrList={missingJiraMRs}
           onMarkAsRead={onMarkAsRead}
@@ -456,7 +646,7 @@ export function ReleaseChecklistPage({
           onLabelClick={onLabelClick}
         />
 
-        {scopedMRs.length === 0 && (
+        {deployScopeMRs.length === 0 && (
           <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow-sm border border-gray-200">
             <p className="text-lg">No merge requests in the release checklist scope.</p>
             <p className="text-sm mt-2">Use a sprint/release label filter or adjust repository filters.</p>
@@ -512,50 +702,30 @@ function CheckRow({ passed, title, detail }: CheckRowProps) {
 interface ReleaseChecklistExportDialogProps {
   visible: boolean;
   onClose: () => void;
-  groups: ReleaseExportGroup[];
+  scope: CardDeployScope;
   jiraHost?: string;
 }
 
 function ReleaseChecklistExportDialog({
   visible,
   onClose,
-  groups,
+  scope,
   jiraHost,
 }: ReleaseChecklistExportDialogProps) {
-  const [texts, setTexts] = useState<Record<string, string>>({});
+  const [text, setText] = useState('');
   const [useFullJiraUrl, setUseFullJiraUrl] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
 
-    const next: Record<string, string> = {};
-    groups.forEach((group) => {
-      next[group.repository] = formatReleaseExportGroup(group, { jiraHost, useFullJiraUrl });
-    });
-    setTexts(next);
-  }, [groups, jiraHost, useFullJiraUrl, visible]);
+    setText(formatCardDeployReport(scope, { jiraHost, useFullJiraUrl }));
+  }, [scope, jiraHost, useFullJiraUrl, visible]);
 
   if (!visible) return null;
 
   const handleCopyAll = async () => {
     try {
-      await navigator.clipboard.writeText(
-        groups
-          .map(
-            (group) =>
-              texts[group.repository] ||
-              formatReleaseExportGroup(group, { jiraHost, useFullJiraUrl }),
-          )
-          .join('\n\n'),
-      );
-    } catch (e) {
-      console.warn('copy failed', e);
-    }
-  };
-
-  const handleCopy = async (repository: string) => {
-    try {
-      await navigator.clipboard.writeText(texts[repository] || '');
+      await navigator.clipboard.writeText(text);
     } catch (e) {
       console.warn('copy failed', e);
     }
@@ -564,7 +734,7 @@ function ReleaseChecklistExportDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-20">
       <div className="fixed inset-0 bg-black opacity-30" onClick={onClose} />
-      <div className="relative max-h-[80vh] w-full max-w-3xl overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+      <div className="relative max-h-[80vh] w-full max-w-4xl overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
         <div className="flex items-center justify-between border-b p-4">
           <h2 className="text-lg font-semibold">Export Release Checklist</h2>
           <div className="flex items-center gap-3">
@@ -582,31 +752,14 @@ function ReleaseChecklistExportDialog({
           </div>
         </div>
 
-        <div className="space-y-4 p-4">
-          {groups.map((group) => (
-            <div key={group.repository} className="rounded border bg-gray-50 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-medium">{group.displayName}</div>
-                  <div className="text-sm text-gray-500">{group.repository}</div>
-                </div>
-                <button
-                  onClick={() => handleCopy(group.repository)}
-                  className="rounded bg-blue-600 px-2 py-1 text-sm text-white"
-                >
-                  Copy
-                </button>
-              </div>
-              <textarea
-                aria-label={`release-export-${group.displayName}`}
-                value={texts[group.repository] || ''}
-                onChange={(e) =>
-                  setTexts((current) => ({ ...current, [group.repository]: e.target.value }))
-                }
-                className="mt-3 min-h-[120px] w-full resize-vertical rounded border p-2 font-mono text-sm"
-              />
-            </div>
-          ))}
+        <div className="p-4">
+          <textarea
+            aria-label="release-card-deploy-export"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            className="min-h-[520px] w-full resize-y rounded border border-gray-300 p-3 font-mono text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            spellCheck={false}
+          />
         </div>
       </div>
     </div>
