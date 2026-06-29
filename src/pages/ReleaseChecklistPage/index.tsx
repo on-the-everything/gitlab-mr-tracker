@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MRTable } from '../../components/MRTable/MRTable';
 import { fetchRepositoryCompare } from '../../services/gitlabApi';
 import { fetchJiraIssuesByVersion, fetchJiraProjectVersions } from '../../services/jiraApi';
@@ -264,6 +264,20 @@ function getReadinessLevel(
   return 'ready';
 }
 
+function getPreferredJiraVersion(
+  versions: JiraVersion[],
+  currentVersion: string,
+  projectKey: string,
+) {
+  const savedVersion = storage.getSelectedJiraVersion(projectKey);
+
+  return (
+    versions.find((version) => version.name === savedVersion) ||
+    versions.find((version) => version.name === currentVersion) ||
+    versions[0]
+  );
+}
+
 const readinessStyles: Record<ReadinessLevel, string> = {
   ready: 'bg-green-50 text-green-800 border-green-200',
   attention: 'bg-yellow-50 text-yellow-800 border-yellow-200',
@@ -302,8 +316,10 @@ export function ReleaseChecklistPage({
   const [loadingJiraVersions, setLoadingJiraVersions] = useState(false);
   const [jiraVersionError, setJiraVersionError] = useState<string | null>(null);
   const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([]);
+  const [selectedComponentFilters, setSelectedComponentFilters] = useState<string[]>([]);
   const [loadingJiraIssues, setLoadingJiraIssues] = useState(false);
   const [jiraError, setJiraError] = useState<string | null>(null);
+  const autoFetchKeyRef = useRef('');
 
   const scopedMRs = useMemo(() => {
     let next = [...mrList];
@@ -383,19 +399,6 @@ export function ReleaseChecklistPage({
     [deployScopeMRs],
   );
 
-  const selectedJiraScope = useMemo(
-    () =>
-      config.jiraVersionScopes.find(
-        (scope) => scope.version === selectedJiraVersion || scope.name === selectedJiraVersion,
-      ),
-    [config.jiraVersionScopes, selectedJiraVersion],
-  );
-
-  const selectedComponentFilters = useMemo(
-    () => selectedJiraScope?.components || [],
-    [selectedJiraScope],
-  );
-
   const hasMatchingJiraVersion = useMemo(
     () => jiraVersions.some((version) => version.name === selectedJiraVersion),
     [jiraVersions, selectedJiraVersion],
@@ -409,6 +412,22 @@ export function ReleaseChecklistPage({
       .filter((version) => version.name.toLowerCase().includes(query))
       .slice(0, 20);
   }, [jiraVersions, selectedJiraVersion]);
+
+  const availableJiraComponents = useMemo(() => {
+    const components = new Set<string>();
+
+    jiraIssues.forEach((issue) => {
+      issue.components.forEach((component) => {
+        if (component.trim()) {
+          components.add(component.trim());
+        }
+      });
+    });
+
+    return Array.from(components).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' }),
+    );
+  }, [jiraIssues]);
 
   const filteredJiraIssues = useMemo(() => {
     const components = selectedComponentFilters.map((component) => component.toLowerCase());
@@ -433,6 +452,13 @@ export function ReleaseChecklistPage({
     summary.total,
     notMergedMRs.length,
     missingJiraMRs.length,
+  );
+
+  const jiraConfigReady = Boolean(
+    config.jiraHost &&
+    config.jiraProjectKey &&
+    config.jiraEmail &&
+    config.jiraAccessToken,
   );
 
   useEffect(() => {
@@ -472,7 +498,14 @@ export function ReleaseChecklistPage({
   useEffect(() => {
     setJiraIssues([]);
     setJiraError(null);
+    setSelectedComponentFilters([]);
   }, [selectedJiraVersion]);
+
+  useEffect(() => {
+    setSelectedComponentFilters((currentFilters) =>
+      currentFilters.filter((component) => availableJiraComponents.includes(component)),
+    );
+  }, [availableJiraComponents]);
 
   useEffect(() => {
     setSelectedJiraVersion(storage.getSelectedJiraVersion(config.jiraProjectKey || ''));
@@ -494,12 +527,12 @@ export function ReleaseChecklistPage({
 
     try {
       const versions = await fetchJiraProjectVersions(config);
-      const savedVersion = storage.getSelectedJiraVersion(config.jiraProjectKey || '');
       setJiraVersions(versions);
-      const preferredVersion =
-        versions.find((version) => version.name === savedVersion) ||
-        versions.find((version) => version.name === selectedJiraVersion) ||
-        versions[0];
+      const preferredVersion = getPreferredJiraVersion(
+        versions,
+        selectedJiraVersion,
+        config.jiraProjectKey || '',
+      );
       if (preferredVersion) {
         setSelectedJiraVersion(preferredVersion.name);
       } else {
@@ -520,6 +553,94 @@ export function ReleaseChecklistPage({
       setLoadingJiraVersions(false);
     }
   };
+
+  useEffect(() => {
+    if (!jiraConfigReady) return;
+
+    const autoFetchKey = [
+      config.jiraHost,
+      config.jiraProjectKey,
+      config.jiraEmail,
+      config.jiraAccessToken,
+    ].join('|');
+
+    if (autoFetchKeyRef.current === autoFetchKey) return;
+    autoFetchKeyRef.current = autoFetchKey;
+
+    let mounted = true;
+
+    const loadJiraScope = async () => {
+      setLoadingJiraVersions(true);
+      setJiraVersionError(null);
+      setJiraError(null);
+
+      try {
+        const versions = await fetchJiraProjectVersions(config);
+        if (!mounted) return;
+
+        setJiraVersions(versions);
+        const preferredVersion = getPreferredJiraVersion(
+          versions,
+          selectedJiraVersion,
+          config.jiraProjectKey || '',
+        );
+
+        if (!preferredVersion) {
+          setSelectedJiraVersion('');
+          setJiraIssues([]);
+          return;
+        }
+
+        setSelectedJiraVersion(preferredVersion.name);
+        storage.saveSelectedJiraVersion(config.jiraProjectKey || '', preferredVersion.name);
+        setLoadingJiraVersions(false);
+        setLoadingJiraIssues(true);
+
+        try {
+          const issues = await fetchJiraIssuesByVersion(config, preferredVersion.name);
+          if (!mounted) return;
+          setJiraIssues(issues);
+        } catch (err) {
+          if (!mounted) return;
+          setJiraIssues([]);
+          setJiraError(err instanceof Error ? err.message : 'Failed to fetch Jira cards');
+        } finally {
+          if (mounted) setLoadingJiraIssues(false);
+        }
+      } catch (err) {
+        if (!mounted) return;
+        const message = err instanceof Error ? err.message : 'Failed to fetch Jira versions';
+        const projectHint =
+          message.toLowerCase().includes('project') ||
+          message.toLowerCase().includes('not found') ||
+          message.includes('404');
+        setJiraVersionError(
+          projectHint
+            ? `${message}. Check Jira project key "${config.jiraProjectKey || '-'}".`
+            : message,
+        );
+        setJiraVersions([]);
+        setJiraIssues([]);
+      } finally {
+        if (mounted) setLoadingJiraVersions(false);
+      }
+    };
+
+    loadJiraScope();
+
+    return () => {
+      mounted = false;
+      if (autoFetchKeyRef.current === autoFetchKey) {
+        autoFetchKeyRef.current = '';
+      }
+    };
+  }, [
+    config.jiraHost,
+    config.jiraProjectKey,
+    config.jiraEmail,
+    config.jiraAccessToken,
+    jiraConfigReady,
+  ]);
 
   const handleFetchJiraCards = async () => {
     if (!selectedJiraVersion) return;
@@ -692,14 +813,48 @@ export function ReleaseChecklistPage({
           <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3">
             <div className="text-sm font-semibold text-gray-900">Component filter</div>
             <div className="mt-2 flex flex-wrap gap-2">
-              {selectedComponentFilters.length ? (
-                selectedComponentFilters.map((component) => (
-                  <span key={component} className="rounded bg-white px-2 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                    {component}
-                  </span>
-                ))
+              {availableJiraComponents.length > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedComponentFilters([])}
+                    className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-gray-200 ${
+                      selectedComponentFilters.length === 0
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    All components
+                  </button>
+                  {availableJiraComponents.map((component) => {
+                    const selected = selectedComponentFilters.includes(component);
+
+                    return (
+                      <button
+                        key={component}
+                        type="button"
+                        onClick={() => {
+                          setSelectedComponentFilters((currentFilters) =>
+                            selected
+                              ? currentFilters.filter((filter) => filter !== component)
+                              : [...currentFilters, component],
+                          );
+                        }}
+                        className={`rounded px-2 py-1 text-xs font-semibold ring-1 ring-gray-200 ${
+                          selected
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                        }`}
+                      >
+                        {component}
+                      </button>
+                    );
+                  })}
+                </>
               ) : (
-                <span className="text-sm text-gray-500">All components</span>
+                <span className="text-sm text-gray-500">
+                  Fetch Jira cards to load components.
+                </span>
               )}
             </div>
           </div>
