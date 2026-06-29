@@ -34,7 +34,7 @@ function normalizeRepositoryGroups(repositoryGroups: unknown): RepositoryGroup[]
 
 function normalizeJiraVersionScopes(scopes: unknown): JiraVersionScope[] {
   if (!Array.isArray(scopes)) {
-    return [{ name: 'AMZ 2.12', version: 'AMZ 2.12', components: [] }];
+    return [];
   }
 
   const normalized = scopes
@@ -58,9 +58,14 @@ function normalizeJiraVersionScopes(scopes: unknown): JiraVersionScope[] {
     })
     .filter((scope) => scope.name && scope.version);
 
-  return normalized.length > 0
-    ? normalized
-    : [{ name: 'AMZ 2.12', version: 'AMZ 2.12', components: [] }];
+  return normalized.filter(
+    (scope) =>
+      !(
+        scope.name === 'AMZ 2.12' &&
+        scope.version === 'AMZ 2.12' &&
+        scope.components.length === 0
+      ),
+  );
 }
 
 function normalizeConfig(config: Partial<AppConfig>): AppConfig {
@@ -534,7 +539,7 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
                           }}
                           className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[`jiraVersionScopeName-${index}`] ? 'border-red-500' : 'border-gray-300'
                             }`}
-                          placeholder="AMZ 2.12"
+                          placeholder="Release version"
                         />
                         {errors[`jiraVersionScopeName-${index}`] && (
                           <p className="mt-1 text-sm text-red-600">
@@ -568,7 +573,7 @@ export function ConfigModal({ isOpen, onClose, config, onSave }: ConfigModalProp
                         }}
                         className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[`jiraVersionScopeVersion-${index}`] ? 'border-red-500' : 'border-gray-300'
                           }`}
-                        placeholder="AMZ 2.12"
+                        placeholder="Release version"
                       />
                       {errors[`jiraVersionScopeVersion-${index}`] && (
                         <p className="mt-1 text-sm text-red-600">

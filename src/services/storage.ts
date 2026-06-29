@@ -7,6 +7,7 @@ const STATUS_FILTERS_KEY = 'gitlab_mr_status_filters';
 const LABEL_FILTERS_KEY = 'gitlab_mr_label_filters';
 const SELECTED_REPOSITORY_KEY = 'gitlab_mr_selected_repository';
 const SELECTED_REPOSITORY_GROUPS_KEY = 'gitlab_mr_selected_repository_groups';
+const SELECTED_JIRA_VERSIONS_KEY = 'gitlab_mr_selected_jira_versions';
 const TEAM_SCOPE_FILTERS_KEY = 'gitlab_mr_team_scope_filters';
 const MR_READ_TIMESTAMPS_KEY = 'gitlab_mr_read_timestamps';
 
@@ -146,6 +147,38 @@ export const storage = {
       localStorage.setItem(SELECTED_REPOSITORY_GROUPS_KEY, JSON.stringify(groups));
     } catch (error) {
       console.error('Failed to save selected repository groups:', error);
+    }
+  },
+
+  getSelectedJiraVersion(projectKey: string): string {
+    try {
+      const normalizedProjectKey = projectKey.trim().toUpperCase();
+      if (!normalizedProjectKey) return '';
+
+      const item = localStorage.getItem(SELECTED_JIRA_VERSIONS_KEY);
+      if (!item) return '';
+
+      const versions = JSON.parse(item) as Record<string, string>;
+      return typeof versions[normalizedProjectKey] === 'string'
+        ? versions[normalizedProjectKey]
+        : '';
+    } catch {
+      return '';
+    }
+  },
+
+  saveSelectedJiraVersion(projectKey: string, version: string): void {
+    try {
+      const normalizedProjectKey = projectKey.trim().toUpperCase();
+      const normalizedVersion = version.trim();
+      if (!normalizedProjectKey || !normalizedVersion) return;
+
+      const item = localStorage.getItem(SELECTED_JIRA_VERSIONS_KEY);
+      const versions = item ? (JSON.parse(item) as Record<string, string>) : {};
+      versions[normalizedProjectKey] = normalizedVersion;
+      localStorage.setItem(SELECTED_JIRA_VERSIONS_KEY, JSON.stringify(versions));
+    } catch (error) {
+      console.error('Failed to save selected Jira version:', error);
     }
   },
 

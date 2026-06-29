@@ -22,20 +22,14 @@ const DEFAULT_CONFIG: AppConfig = {
     sp14: "",
     sp15: "",
   },
-  jiraVersionScopes: [
-    {
-      name: "AMZ 2.12",
-      version: "AMZ 2.12",
-      components: [],
-    },
-  ],
+  jiraVersionScopes: [],
 };
 
 function normalizeJiraVersionScopes(
   scopes: Partial<AppConfig>["jiraVersionScopes"],
 ): AppConfig["jiraVersionScopes"] {
   if (!Array.isArray(scopes)) {
-    return DEFAULT_CONFIG.jiraVersionScopes;
+    return [];
   }
 
   const normalized = scopes
@@ -51,7 +45,14 @@ function normalizeJiraVersionScopes(
     }))
     .filter((scope) => scope.name && scope.version);
 
-  return normalized.length > 0 ? normalized : DEFAULT_CONFIG.jiraVersionScopes;
+  return normalized.filter(
+    (scope) =>
+      !(
+        scope.name === "AMZ 2.12" &&
+        scope.version === "AMZ 2.12" &&
+        scope.components.length === 0
+      ),
+  );
 }
 
 function migrateConfig(saved: Partial<AppConfig>): AppConfig {

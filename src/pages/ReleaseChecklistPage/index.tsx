@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { MRTable } from '../../components/MRTable/MRTable';
 import { fetchRepositoryCompare } from '../../services/gitlabApi';
 import { fetchJiraIssuesByVersion, fetchJiraProjectVersions } from '../../services/jiraApi';
+import { storage } from '../../services/storage';
 import { AppConfig, JiraIssue, JiraVersion, MergeRequest, MRStatus, type RepositoryGroup } from '../../types';
 import { buildJiraTicketUrl, extractJiraTickets } from '../../utils/jira';
 import { filterMRsByRepositoryGroups } from '../../utils/repositoryGroups';
@@ -293,8 +294,11 @@ export function ReleaseChecklistPage({
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [exportVisible, setExportVisible] = useState(false);
-  const [selectedJiraVersion, setSelectedJiraVersion] = useState('AMZ 2.12');
+  const [selectedJiraVersion, setSelectedJiraVersion] = useState(() =>
+    storage.getSelectedJiraVersion(config.jiraProjectKey || ''),
+  );
   const [jiraVersions, setJiraVersions] = useState<JiraVersion[]>([]);
+  const [jiraVersionSearchFocused, setJiraVersionSearchFocused] = useState(false);
   const [loadingJiraVersions, setLoadingJiraVersions] = useState(false);
   const [jiraVersionError, setJiraVersionError] = useState<string | null>(null);
   const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([]);
@@ -392,6 +396,20 @@ export function ReleaseChecklistPage({
     [selectedJiraScope],
   );
 
+  const hasMatchingJiraVersion = useMemo(
+    () => jiraVersions.some((version) => version.name === selectedJiraVersion),
+    [jiraVersions, selectedJiraVersion],
+  );
+
+  const filteredJiraVersions = useMemo(() => {
+    const query = selectedJiraVersion.trim().toLowerCase();
+    if (!query) return jiraVersions.slice(0, 20);
+
+    return jiraVersions
+      .filter((version) => version.name.toLowerCase().includes(query))
+      .slice(0, 20);
+  }, [jiraVersions, selectedJiraVersion]);
+
   const filteredJiraIssues = useMemo(() => {
     const components = selectedComponentFilters.map((component) => component.toLowerCase());
     if (components.length === 0) return jiraIssues;
@@ -456,19 +474,36 @@ export function ReleaseChecklistPage({
     setJiraError(null);
   }, [selectedJiraVersion]);
 
+  useEffect(() => {
+    setSelectedJiraVersion(storage.getSelectedJiraVersion(config.jiraProjectKey || ''));
+    setJiraVersions([]);
+    setJiraIssues([]);
+    setJiraError(null);
+    setJiraVersionError(null);
+  }, [config.jiraProjectKey]);
+
+  useEffect(() => {
+    if (hasMatchingJiraVersion) {
+      storage.saveSelectedJiraVersion(config.jiraProjectKey || '', selectedJiraVersion);
+    }
+  }, [config.jiraProjectKey, hasMatchingJiraVersion, selectedJiraVersion]);
+
   const handleFetchJiraVersions = async () => {
     setLoadingJiraVersions(true);
     setJiraVersionError(null);
 
     try {
       const versions = await fetchJiraProjectVersions(config);
+      const savedVersion = storage.getSelectedJiraVersion(config.jiraProjectKey || '');
       setJiraVersions(versions);
       const preferredVersion =
+        versions.find((version) => version.name === savedVersion) ||
         versions.find((version) => version.name === selectedJiraVersion) ||
-        versions.find((version) => version.name === 'AMZ 2.12') ||
         versions[0];
       if (preferredVersion) {
         setSelectedJiraVersion(preferredVersion.name);
+      } else {
+        setSelectedJiraVersion('');
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch Jira versions';
@@ -573,25 +608,45 @@ export function ReleaseChecklistPage({
 
           <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <div>
-                <label htmlFor="release-jira-version-select" className="block text-sm font-medium text-gray-700">
+              <div className="relative">
+                <label htmlFor="release-jira-version-input" className="block text-sm font-medium text-gray-700">
                   Jira Version
                 </label>
-                <select
-                  id="release-jira-version-select"
+                <input
+                  id="release-jira-version-input"
+                  type="text"
                   value={selectedJiraVersion}
                   onChange={(event) => setSelectedJiraVersion(event.target.value)}
+                  onFocus={() => setJiraVersionSearchFocused(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => setJiraVersionSearchFocused(false), 150);
+                  }}
+                  disabled={jiraVersions.length === 0}
                   className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-56"
-                >
-                  {jiraVersions.length === 0 && (
-                    <option value="AMZ 2.12">AMZ 2.12</option>
-                  )}
-                  {jiraVersions.map((version) => (
-                    <option key={version.id} value={version.name}>
-                      {version.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder={jiraVersions.length === 0 ? 'Fetch versions first' : 'Type to search version'}
+                />
+                {jiraVersionSearchFocused && jiraVersions.length > 0 ? (
+                  <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded border border-gray-200 bg-white py-1 text-sm shadow-lg sm:w-56">
+                    {filteredJiraVersions.length > 0 ? (
+                      filteredJiraVersions.map((version) => (
+                        <button
+                          key={version.id}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setSelectedJiraVersion(version.name);
+                            setJiraVersionSearchFocused(false);
+                          }}
+                          className="block w-full px-3 py-2 text-left text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                        >
+                          {version.name}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-gray-500">No matching versions</div>
+                    )}
+                  </div>
+                ) : null}
               </div>
 
               <div className="text-sm text-gray-600">
@@ -622,6 +677,7 @@ export function ReleaseChecklistPage({
                   loadingJiraIssues ||
                   jiraVersions.length === 0 ||
                   !selectedJiraVersion ||
+                  !hasMatchingJiraVersion ||
                   !config.jiraHost ||
                   !config.jiraEmail ||
                   !config.jiraAccessToken
@@ -675,6 +731,12 @@ export function ReleaseChecklistPage({
           {config.jiraHost && config.jiraProjectKey && jiraVersions.length === 0 && !loadingJiraVersions ? (
             <div className="mt-3 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
               Fetch Jira versions first, then fetch cards for the selected version.
+            </div>
+          ) : null}
+
+          {jiraVersions.length > 0 && selectedJiraVersion && !hasMatchingJiraVersion ? (
+            <div className="mt-3 rounded border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+              Select a Jira version from the fetched results before fetching cards.
             </div>
           ) : null}
 
