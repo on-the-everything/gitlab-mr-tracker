@@ -14,6 +14,11 @@ const DEFAULT_CONFIG: AppConfig = {
   fetchTimeValue: 2,
   fetchClosedMRs: false,
   repositoryGroups: [],
+  sprintCardScopes: {
+    sp13: "",
+    sp14: "",
+    sp15: "",
+  },
 };
 
 function migrateConfig(saved: Partial<AppConfig>): AppConfig {
@@ -30,6 +35,10 @@ function migrateConfig(saved: Partial<AppConfig>): AppConfig {
     repositoryGroups: Array.isArray(saved.repositoryGroups)
       ? saved.repositoryGroups
       : [],
+    sprintCardScopes:
+      saved.sprintCardScopes && typeof saved.sprintCardScopes === "object"
+        ? saved.sprintCardScopes
+        : DEFAULT_CONFIG.sprintCardScopes,
   };
 }
 
@@ -49,7 +58,8 @@ export function useConfig() {
         saved.fetchClosedMRs === undefined ||
         saved.myTeamAccounts === undefined ||
         saved.partnerTeamAccounts === undefined ||
-        saved.repositoryGroups === undefined;
+        saved.repositoryGroups === undefined ||
+        saved.sprintCardScopes === undefined;
 
       if (needsMigration) {
         const migrated = migrateConfig(saved);

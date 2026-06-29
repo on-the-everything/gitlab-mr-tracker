@@ -36,11 +36,14 @@ interface ReleaseExportItem {
 }
 
 interface CardDeployScope {
+  sprintName: string;
   cards: string[];
   relatedMRs: MergeRequest[];
   groups: ReleaseExportGroup[];
   unmatchedCards: string[];
 }
+
+const DEFAULT_SPRINTS = ['sp13', 'sp14', 'sp15'];
 
 function countByStatus(mrs: MergeRequest[]) {
   return {
@@ -122,7 +125,33 @@ function buildReleaseExportGroups(mrs: MergeRequest[]): ReleaseExportGroup[] {
     });
 }
 
-function buildCardDeployScope(cards: string[], mrs: MergeRequest[]): CardDeployScope {
+function normalizeSprintName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, '');
+}
+
+function getConfiguredSprints(sprintCardScopes?: Record<string, string>) {
+  return Array.from(
+    new Set([
+      ...DEFAULT_SPRINTS,
+      ...Object.keys(sprintCardScopes || {}).map(normalizeSprintName).filter(Boolean),
+    ]),
+  ).sort((a, b) => {
+    const aNumber = Number(a.match(/\d+/)?.[0] || Number.MAX_SAFE_INTEGER);
+    const bNumber = Number(b.match(/\d+/)?.[0] || Number.MAX_SAFE_INTEGER);
+    if (aNumber !== bNumber) return aNumber - bNumber;
+    return a.localeCompare(b);
+  });
+}
+
+function formatSprintLabel(sprintName: string) {
+  return sprintName.toUpperCase();
+}
+
+function buildCardDeployScope(
+  sprintName: string,
+  cards: string[],
+  mrs: MergeRequest[],
+): CardDeployScope {
   const cardSet = new Set(cards);
   const relatedMRs = mrs.filter((mr) =>
     getJiraTickets(mr).some((ticket) => cardSet.has(ticket)),
@@ -136,6 +165,7 @@ function buildCardDeployScope(cards: string[], mrs: MergeRequest[]): CardDeployS
   });
 
   return {
+    sprintName,
     cards,
     relatedMRs,
     groups: buildReleaseExportGroups(relatedMRs),
@@ -236,7 +266,7 @@ function formatCardDeployReport(
       : [];
 
   return [
-    '1. Cards that will be shown in each SP',
+    `1. Cards that will be shown in ${formatSprintLabel(scope.sprintName)}`,
     ...cardLines,
     ...unmatchedLines,
     '',

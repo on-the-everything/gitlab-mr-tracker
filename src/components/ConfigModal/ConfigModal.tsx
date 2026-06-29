@@ -33,6 +33,11 @@ function normalizeRepositoryGroups(repositoryGroups: unknown): RepositoryGroup[]
 }
 
 function normalizeConfig(config: Partial<AppConfig>): AppConfig {
+  const sprintCardScopes =
+    config.sprintCardScopes && typeof config.sprintCardScopes === 'object'
+      ? config.sprintCardScopes
+      : {};
+
   return {
     gitlabHost: config.gitlabHost || '',
     accessToken: config.accessToken || '',
@@ -54,6 +59,12 @@ function normalizeConfig(config: Partial<AppConfig>): AppConfig {
     fetchClosedMRs: config.fetchClosedMRs !== undefined ? config.fetchClosedMRs : false,
     jiraHost: config.jiraHost || '',
     repositoryGroups: normalizeRepositoryGroups(config.repositoryGroups),
+    sprintCardScopes: {
+      sp13: '',
+      sp14: '',
+      sp15: '',
+      ...sprintCardScopes,
+    },
   };
 }
 
@@ -83,6 +94,11 @@ function sanitizeConfig(config: AppConfig): AppConfig {
     teamAccounts: undefined,
     repositoryGroups: normalizeRepositoryGroups(config.repositoryGroups).filter(
       (group) => group.name && group.repositories.length > 0,
+    ),
+    sprintCardScopes: Object.fromEntries(
+      Object.entries(config.sprintCardScopes || {})
+        .map(([sprint, cards]) => [sprint.trim().toLowerCase(), cards])
+        .filter(([sprint]) => sprint),
     ),
   };
 }

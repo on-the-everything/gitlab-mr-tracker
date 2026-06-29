@@ -65,6 +65,7 @@ export interface AppConfig {
   fetchTimeValue: number;
   fetchClosedMRs: boolean;
   repositoryGroups: RepositoryGroup[];
+  sprintCardScopes: Record<string, string>;
 }
 
 export interface ParsedMRUrl {
