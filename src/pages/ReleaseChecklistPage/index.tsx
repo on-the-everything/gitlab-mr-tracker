@@ -319,6 +319,7 @@ export function ReleaseChecklistPage({
   const [selectedComponentFilters, setSelectedComponentFilters] = useState<string[]>([]);
   const [loadingJiraIssues, setLoadingJiraIssues] = useState(false);
   const [jiraError, setJiraError] = useState<string | null>(null);
+  const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
   const autoFetchKeyRef = useRef('');
   const restoredComponentFilterKeyRef = useRef('');
 
@@ -449,6 +450,13 @@ export function ReleaseChecklistPage({
     () => buildCardDeployScope(selectedJiraVersion || 'Jira Version', jiraCards, deployScopeMRs),
     [selectedJiraVersion, jiraCards, deployScopeMRs],
   );
+
+  const selectedCardMRs = useMemo(() => {
+    if (!selectedCardKey) return [];
+    return deployScopeMRs.filter((mr) =>
+      getJiraTickets(mr).includes(selectedCardKey),
+    );
+  }, [selectedCardKey, deployScopeMRs]);
 
   const readinessLevel = getReadinessLevel(
     summary.total,
@@ -942,20 +950,86 @@ export function ReleaseChecklistPage({
                   {filteredJiraIssues.length === 0 ? (
                     <div className="text-sm text-gray-500">No cards match the configured component filter.</div>
                   ) : (
-                    filteredJiraIssues.map((issue) => (
-                      <a
-                        key={issue.key}
-                        href={issue.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block rounded bg-white px-3 py-2 text-sm text-gray-800 ring-1 ring-gray-200 hover:text-blue-700"
-                      >
-                        <div className="font-semibold">{issue.key}: {issue.summary}</div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {issue.status} · {issue.components.length > 0 ? issue.components.join(', ') : 'No component'}
+                    filteredJiraIssues.map((issue) => {
+                      const isSelected = selectedCardKey === issue.key;
+                      const mrCount = deployScopeMRs.filter((mr) =>
+                        getJiraTickets(mr).includes(issue.key),
+                      ).length;
+                      return (
+                        <div
+                          key={issue.key}
+                          className={`rounded bg-white ring-1 text-sm text-gray-800 ${
+                            isSelected
+                              ? 'ring-blue-400 shadow-sm'
+                              : 'ring-gray-200'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2 px-3 py-2">
+                            <button
+                              type="button"
+                              title={isSelected ? 'Hide MR list' : 'Show MR list'}
+                              onClick={() =>
+                                setSelectedCardKey(isSelected ? null : issue.key)
+                              }
+                              className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold ring-1 transition-colors ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white ring-blue-600'
+                                  : 'bg-white text-gray-600 ring-gray-300 hover:bg-blue-50 hover:text-blue-700 hover:ring-blue-400'
+                              }`}
+                            >
+                              {mrCount} MR{mrCount !== 1 ? 's' : ''}
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              <a
+                                href={issue.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold hover:text-blue-700"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {issue.key}: {issue.summary}
+                              </a>
+                              <div className="mt-1 text-xs text-gray-500">
+                                {issue.status} · {issue.components.length > 0 ? issue.components.join(', ') : 'No component'}
+                              </div>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <div className="border-t border-blue-100 px-3 py-2">
+                              {selectedCardMRs.length === 0 ? (
+                                <div className="text-xs text-gray-500">No MRs found for this card in the current scope.</div>
+                              ) : (
+                                <ul className="space-y-1">
+                                  {selectedCardMRs.map((mr) => (
+                                    <li key={mr.id} className="flex items-center justify-between gap-2">
+                                      <a
+                                        href={mr.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="truncate text-xs font-medium text-blue-700 hover:underline"
+                                      >
+                                        !{mr.iid} {mr.title}
+                                      </a>
+                                      <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold ring-1 ${
+                                        mr.status === 'merged'
+                                          ? 'bg-green-50 text-green-700 ring-green-200'
+                                          : mr.status === 'approved'
+                                            ? 'bg-blue-50 text-blue-700 ring-blue-200'
+                                            : mr.status === 'rejected'
+                                              ? 'bg-red-50 text-red-700 ring-red-200'
+                                              : 'bg-gray-50 text-gray-600 ring-gray-200'
+                                      }`}>
+                                        {mr.status}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </a>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
