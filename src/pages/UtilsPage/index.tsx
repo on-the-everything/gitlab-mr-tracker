@@ -348,7 +348,7 @@ export default function UtilsPage() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <button
-                            onClick={handleGzipAuto}
+                            onClick={() => handleGzipAuto()}
                             disabled={!gzipInput.trim() || gzipLoading}
                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                         >
@@ -359,7 +359,7 @@ export default function UtilsPage() {
                                     : '📦 Compress'}
                         </button>
                         <button
-                            onClick={handleGzipCompress}
+                            onClick={() => handleGzipCompress()}
                             disabled={!gzipInput.trim() || gzipLoading}
                             className="px-3 py-2 bg-white text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                             title="Force compress"
@@ -367,7 +367,7 @@ export default function UtilsPage() {
                             Force 📦
                         </button>
                         <button
-                            onClick={handleGzipDecompress}
+                            onClick={() => handleGzipDecompress()}
                             disabled={!gzipInput.trim() || gzipLoading}
                             className="px-3 py-2 bg-white text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-medium"
                             title="Force decompress"
