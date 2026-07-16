@@ -35,6 +35,12 @@ const navItems = [
         title: 'Compare develop → master',
     },
     {
+        to: '/monitor-master',
+        label: 'Monitor Master',
+        icon: '🛡️',
+        title: 'Check if master has drifted from develop',
+    },
+    {
         to: '/feature',
         label: 'Feature',
         icon: '✨',

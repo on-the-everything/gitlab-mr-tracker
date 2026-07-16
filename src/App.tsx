@@ -13,6 +13,7 @@ import CompareBranchesPage from './pages/CompareBranchesPage';
 import FeaturePage from './pages/Feature';
 import UtilsPage from './pages/UtilsPage';
 import ReleaseChecklistPage from './pages/ReleaseChecklistPage';
+import MonitorMasterPage from './pages/MonitorMasterPage';
 
 import { MRStatus } from './types';
 import { storage } from './services/storage';
@@ -186,7 +187,7 @@ function App() {
   useAutoRefresh(config, mrList, updateMRList, subscribeToAccounts);
 
   const location = useLocation();
-  const hideFilterControls = location.pathname === '/feature' || location.pathname === '/utils';
+  const hideFilterControls = location.pathname === '/feature' || location.pathname === '/utils' || location.pathname === '/monitor-master';
 
   // Categorize and filter MRs
   const categorized = categorizeMRs(mrList);
@@ -487,6 +488,12 @@ function App() {
                 selectedRepositoryGroups={selectedRepositoryGroups}
                 teamScopeFilters={teamScopeFilters}
               />
+            )}
+          />
+          <Route
+            path="/monitor-master"
+            element={(
+              <MonitorMasterPage />
             )}
           />
           <Route
